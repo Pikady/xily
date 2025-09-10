@@ -8,4 +8,4 @@ pub use works::WorksService;
 pub use timer::TimerService;
 pub use analytics::AnalyticsService;
 pub use window::WindowManager;
-pub use tray::{create_tray, handle_tray_event};
+pub use tray::create_tray;
