@@ -1,17 +1,118 @@
-import React from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Play, Plus, BarChart3, Clock } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Play, Plus, BarChart3, Clock, TrendingUp, Target, Calendar, Award } from 'lucide-react';
+import { useAnalyticsStore } from '@/stores/analyticsStore';
+import { useWorksStore } from '@/stores/worksStore';
+import { useTimerStore } from '@/stores/timerStore';
+import { 
+  TimeStatsCard, 
+  SessionStatsCard, 
+  WorkStatsCard,
+  GoalProgressCard 
+} from '@/components/charts/StatCards';
+import { TimeDistributionCharts } from '@/components/charts/TimeDistributionCharts';
+import { TrendAnalysisCharts } from '@/components/charts/TrendAnalysisCharts';
+import { DataFilter } from '@/components/charts/DataFilter';
+import { DataStatusIndicator } from '@/components/charts/DataStatusIndicator';
+import { useDataSync } from '@/hooks/useDataSync';
+import { formatDuration, getDaysBetween } from '@/utils/format';
 
 export function Dashboard() {
+  const {
+    timeDistribution,
+    dailyStats,
+    weeklyStats,
+    trendData,
+    filters,
+    loading: analyticsLoading,
+    error: analyticsError,
+    fetchTimeDistribution,
+    fetchDailyStats,
+    fetchWeeklyStats,
+    fetchTrendData,
+    setFilters,
+    refreshAllData
+  } = useAnalyticsStore();
+
+  const { works } = useWorksStore();
+  const { timerConfig, timerHistory } = useTimerStore();
+
+  // 使用数据同步hook
+  const { refresh, loading: syncLoading, error: syncError, lastSyncTime } = useDataSync({
+    interval: 30000, // 30秒自动更新
+    enabled: true,
+    retryCount: 3
+  });
+
+  // 初始化数据
+  useEffect(() => {
+    const initializeFilters = () => {
+      const today = new Date();
+      const thirtyDaysAgo = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 29);
+      
+      setFilters({
+        date_range: {
+          start: thirtyDaysAgo.toISOString().split('T')[0],
+          end: today.toISOString().split('T')[0]
+        }
+      });
+    };
+
+    initializeFilters();
+  }, [setFilters]);
+
+  // 获取分析数据
+  useEffect(() => {
+    if (filters.date_range.start && filters.date_range.end) {
+      refreshAllData();
+    }
+  }, [filters, refreshAllData]);
+
+  // 计算统计数据
+  const stats = useMemo(() => {
+    const totalTime = dailyStats.reduce((sum, stat) => sum + stat.total_time, 0);
+    const exploreTime = dailyStats.reduce((sum, stat) => sum + stat.explore_time, 0);
+    const utilizeTime = dailyStats.reduce((sum, stat) => sum + stat.utilize_time, 0);
+    
+    const totalSessions = dailyStats.reduce((sum, stat) => sum + stat.session_count, 0);
+    const completedSessions = dailyStats.reduce((sum, stat) => sum + stat.completed_sessions, 0);
+    const averageSessionTime = totalSessions > 0 ? totalTime / totalSessions : 0;
+
+    const activeWorks = timeDistribution.length;
+    const topWork = timeDistribution.length > 0 ? {
+      name: timeDistribution[0].work_name,
+      time: timeDistribution[0].total_time,
+      percentage: timeDistribution[0].percentage
+    } : undefined;
+
+    return {
+      totalTime,
+      exploreTime,
+      utilizeTime,
+      totalSessions,
+      completedSessions,
+      averageSessionTime,
+      activeWorks,
+      topWork
+    };
+  }, [dailyStats, timeDistribution]);
+
+  // 计算今日统计
+  const todayStats = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
+    return dailyStats.find(stat => stat.date === today);
+  }, [dailyStats]);
+
   return (
     <div className="space-y-6">
       {/* 欢迎区域 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">仪表板</h1>
+          <h1 className="text-3xl font-bold">数据分析仪表板</h1>
           <p className="text-muted-foreground mt-1">
-            欢迎回来！今天是专注的一天
+            深入了解你的时间投入和效率趋势
           </p>
         </div>
         <div className="flex space-x-2">
@@ -26,60 +127,88 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* 统计卡片 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">今日专注</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">2h 30m</div>
-            <p className="text-xs text-muted-foreground">
-              +20% 相比昨天
-            </p>
-          </CardContent>
-        </Card>
+      {/* 数据筛选器 */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between mb-4">
+            <DataFilter
+              filters={filters}
+              onFiltersChange={setFilters}
+              works={works}
+              onRefresh={refresh}
+            />
+            <DataStatusIndicator
+              loading={syncLoading}
+              error={syncError}
+              lastSyncTime={lastSyncTime}
+              onRefresh={refresh}
+              autoRefresh={true}
+            />
+          </div>
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">本周专注</CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">18h 45m</div>
-            <p className="text-xs text-muted-foreground">
-              +12% 相比上周
-            </p>
-          </CardContent>
-        </Card>
+      {/* 核心统计 */}
+      <TimeStatsCard
+        totalTime={stats.totalTime}
+        exploreTime={stats.exploreTime}
+        utilizeTime={stats.utilizeTime}
+        previousTotalTime={todayStats ? stats.totalTime - todayStats.total_time : undefined}
+      />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">完成项目</CardTitle>
-            <Play className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">12</div>
-            <p className="text-xs text-muted-foreground">
-              本月完成数
-            </p>
-          </CardContent>
-        </Card>
+      <SessionStatsCard
+        totalSessions={stats.totalSessions}
+        completedSessions={stats.completedSessions}
+        averageSessionTime={stats.averageSessionTime}
+      />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">专注效率</CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">85%</div>
-            <p className="text-xs text-muted-foreground">
-              计划完成率
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <WorkStatsCard
+        totalWorks={works.length}
+        activeWorks={stats.activeWorks}
+        topWork={stats.topWork}
+      />
+
+      {/* 图表分析 */}
+      <Tabs defaultValue="distribution" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="distribution">时间分布</TabsTrigger>
+          <TabsTrigger value="trends">趋势分析</TabsTrigger>
+          <TabsTrigger value="goals">目标进度</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="distribution" className="space-y-6">
+          <TimeDistributionCharts
+            data={timeDistribution}
+            loading={analyticsLoading}
+            error={analyticsError}
+          />
+        </TabsContent>
+
+        <TabsContent value="trends" className="space-y-6">
+          <TrendAnalysisCharts
+            data={trendData}
+            loading={analyticsLoading}
+            error={analyticsError}
+          />
+        </TabsContent>
+
+        <TabsContent value="goals" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {works.filter(work => work.target_hours > 0).map(work => {
+              const workTime = timeDistribution.find(d => d.work_id === work.id)?.total_time || 0;
+              return (
+                <GoalProgressCard
+                  key={work.id}
+                  title={work.name}
+                  currentProgress={workTime}
+                  targetGoal={work.target_hours * 60} // 转换为分钟
+                  timeRemaining={30} // 示例值
+                />
+              );
+            })}
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* 快速操作 */}
       <Card>
@@ -109,38 +238,6 @@ export function Dashboard() {
               <span>利用模式</span>
               <span className="text-xs text-muted-foreground">创作输出阶段</span>
             </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* 最近活动 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>最近活动</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 rounded-full bg-explore"></div>
-                <div>
-                  <p className="font-medium">前端开发文档</p>
-                  <p className="text-sm text-muted-foreground">探索模式 · 25分钟</p>
-                </div>
-              </div>
-              <span className="text-sm text-muted-foreground">10分钟前</span>
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 rounded-full bg-utilize"></div>
-                <div>
-                  <p className="font-medium">代码重构</p>
-                  <p className="text-sm text-muted-foreground">利用模式 · 45分钟</p>
-                </div>
-              </div>
-              <span className="text-sm text-muted-foreground">1小时前</span>
-            </div>
           </div>
         </CardContent>
       </Card>

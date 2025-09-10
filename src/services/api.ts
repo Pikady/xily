@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { Work, WorkStats } from '@/types/work'
 import { TimerSession, TimerConfig } from '@/types/timer'
-import { ExportData } from '@/types/analytics'
+import { ExportData, TimeRecord, TimeDistribution, DailyStats, WeeklyStats, MonthlyStats, TrendData, AnalyticsFilters, ExportFormat } from '@/types/analytics'
 import { WorkFormData, AnalyticsData } from '@/types/frontend'
 
 // API响应基础类型
@@ -117,41 +117,62 @@ export class TimerAPI {
 
 // 分析相关API
 export class AnalyticsAPI {
-  // 获取分析数据
+  // 获取时间记录
+  static async getTimeRecords(filters?: AnalyticsFilters): Promise<TimeRecord[]> {
+    return tauriInvoke<TimeRecord[]>('get_time_records', { filters })
+  }
+
+  // 获取时间分布
+  static async getTimeDistribution(filters?: AnalyticsFilters): Promise<TimeDistribution[]> {
+    return tauriInvoke<TimeDistribution[]>('get_time_distribution', { filters })
+  }
+
+  // 获取每日统计
+  static async getDailyStats(filters?: AnalyticsFilters): Promise<DailyStats[]> {
+    return tauriInvoke<DailyStats[]>('get_daily_stats', { filters })
+  }
+
+  // 获取每周统计
+  static async getWeeklyStats(filters?: AnalyticsFilters): Promise<WeeklyStats[]> {
+    return tauriInvoke<WeeklyStats[]>('get_weekly_stats', { filters })
+  }
+
+  // 获取每月统计
+  static async getMonthlyStats(filters?: AnalyticsFilters): Promise<MonthlyStats[]> {
+    return tauriInvoke<MonthlyStats[]>('get_monthly_stats', { filters })
+  }
+
+  // 获取趋势数据
+  static async getTrendData(filters?: AnalyticsFilters): Promise<TrendData[]> {
+    return tauriInvoke<TrendData[]>('get_trend_data', { filters })
+  }
+
+  // 导出数据
+  static async exportData(format: ExportFormat, filters?: AnalyticsFilters): Promise<ExportData> {
+    return tauriInvoke<ExportData>('export_data', { format, filters })
+  }
+
+  // 获取分析数据（兼容旧接口）
   static async getAnalytics(params: {
     startDate?: string
     endDate?: string
     workId?: number
     mode?: 'explore' | 'utilize'
   }): Promise<AnalyticsData> {
-    return tauriInvoke<AnalyticsData>('get_analytics', { params })
-  }
-
-  // 获取每日统计
-  static async getDailyStats(date: string): Promise<any> {
-    return tauriInvoke<any>('get_daily_stats', { date })
-  }
-
-  // 获取每周统计
-  static async getWeeklyStats(year: number, week: number): Promise<any> {
-    return tauriInvoke<any>('get_weekly_stats', { year, week })
-  }
-
-  // 获取每月统计
-  static async getMonthlyStats(year: number, month: number): Promise<any> {
-    return tauriInvoke<any>('get_monthly_stats', { year, month })
-  }
-
-  // 导出数据
-  static async exportData(params: {
-    format: 'json' | 'csv' | 'pdf'
-    startDate?: string
-    endDate?: string
-    workId?: number
-  }): Promise<ExportData> {
-    return tauriInvoke<ExportData>('export_data', { params })
+    const filters: AnalyticsFilters = {
+      date_range: {
+        start: params.startDate || '',
+        end: params.endDate || ''
+      },
+      work_ids: params.workId ? [params.workId] : undefined,
+      modes: params.mode ? [params.mode] : undefined
+    }
+    return tauriInvoke<AnalyticsData>('get_analytics', { filters })
   }
 }
+
+// 兼容命名导出：与 store 中的 `import { analyticsAPI }` 对齐
+export const analyticsAPI = AnalyticsAPI;
 
 // 应用设置API
 export class SettingsAPI {
