@@ -118,7 +118,7 @@ impl TimerService {
 
     pub fn save_timer_config(config: &TimerConfig) -> Result<()> {
         let conn = get_connection()?;
-        let config_str = serde_json::to_string(config)?;
+        let config_str = serde_json::to_string(config).map_err(|e| rusqlite::Error::InvalidColumnType(0, format!("JSON serialization error: {}", e), rusqlite::types::Type::Null))?;
         
         conn.execute(
             "INSERT OR REPLACE INTO user_settings (key, value) VALUES ('timer_config', ?1)",

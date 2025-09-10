@@ -1,4 +1,4 @@
-use rusqlite::{Connection, Result};
+use rusqlite::{Connection, Result, types::Type};
 use std::sync::Mutex;
 use once_cell::sync::Lazy;
 
@@ -54,6 +54,7 @@ pub fn init_database() -> Result<()> {
 }
 
 pub fn get_connection() -> Result<Connection> {
-    DB_CONN.lock().unwrap().as_ref().cloned()
-        .ok_or_else(|| rusqlite::Error::InvalidColumnType(0, "Database not initialized".into(), rusqlite::Type::Null))
-}
+    let guard = DB_CONN.lock().unwrap();
+    guard.as_ref()
+        .ok_or_else(|| rusqlite::Error::InvalidColumnType(0, "Database not initialized".into(), Type::Null))?;
+    Ok(Connection::open("xily.db")?)}

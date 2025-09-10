@@ -5,7 +5,7 @@ use std::path::Path;
 use uuid::Uuid;
 
 pub mod time_utils {
-    use chrono::{DateTime, Utc, Duration};
+    use chrono::{DateTime, Utc, Duration ,Datelike, Timelike};
     
     pub fn format_duration(minutes: i32) -> String {
         let hours = minutes / 60;
@@ -255,6 +255,19 @@ pub mod config_utils {
     
     pub fn merge_with_defaults(config: &Value) -> Value {
         let defaults = get_default_config();
-        json_utils::merge_json(&defaults, config)
+        merge_json_objects(&defaults, config)
+    }
+    
+    fn merge_json_objects(a: &Value, b: &Value) -> Value {
+        match (a, b) {
+            (Value::Object(a_map), Value::Object(b_map)) => {
+                let mut result = a_map.clone();
+                for (key, value) in b_map {
+                    result.insert(key.clone(), merge_json_objects(a_map.get(key).unwrap_or(&Value::Null), value));
+                }
+                Value::Object(result)
+            }
+            (_, b_val) => b_val.clone(),
+        }
     }
 }
