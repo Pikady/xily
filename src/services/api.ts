@@ -1,0 +1,261 @@
+import { invoke } from '@tauri-apps/api/core'
+import { Work, WorkFormData, WorkStats } from '@/types/work'
+import { TimerSession, TimerConfig } from '@/types/timer'
+import { AnalyticsData, ExportData } from '@/types/analytics'
+
+// API响应基础类型
+interface ApiResponse<T> {
+  data: T
+  message: string
+  success: boolean
+}
+
+// API错误类型
+interface ApiError {
+  code: string
+  message: string
+  details?: any
+}
+
+// API配置
+const API_CONFIG = {
+  timeout: 10000,
+  retries: 3,
+  retryDelay: 1000
+}
+
+// 通用API请求函数
+async function apiRequest<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<ApiResponse<T>> {
+  try {
+    const response = await fetch(`/api${endpoint}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+      }
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error(`API请求失败: ${endpoint}`, error)
+    throw error
+  }
+}
+
+// Tauri命令调用包装器
+async function tauriInvoke<T>(command: string, args?: any): Promise<T> {
+  try {
+    return await invoke<T>(command, args)
+  } catch (error) {
+    console.error(`Tauri命令调用失败: ${command}`, error)
+    throw error
+  }
+}
+
+// 作品相关API
+export class WorksAPI {
+  // 获取所有作品
+  static async getAllWorks(): Promise<Work[]> {
+    return tauriInvoke<Work[]>('get_all_works')
+  }
+
+  // 获取单个作品
+  static async getWork(id: string): Promise<Work> {
+    return tauriInvoke<Work>('get_work', { id })
+  }
+
+  // 创建作品
+  static async createWork(workData: WorkFormData): Promise<Work> {
+    return tauriInvoke<Work>('create_work', { workData })
+  }
+
+  // 更新作品
+  static async updateWork(id: string, workData: Partial<WorkFormData>): Promise<Work> {
+    return tauriInvoke<Work>('update_work', { id, workData })
+  }
+
+  // 删除作品
+  static async deleteWork(id: string): Promise<void> {
+    return tauriInvoke<void>('delete_work', { id })
+  }
+
+  // 获取作品统计
+  static async getWorkStats(id: string): Promise<WorkStats> {
+    return tauriInvoke<WorkStats>('get_work_stats', { id })
+  }
+
+  // 获取所有作品统计
+  static async getAllWorksStats(): Promise<WorkStats[]> {
+    return tauriInvoke<WorkStats[]>('get_all_works_stats')
+  }
+}
+
+// 计时器相关API
+export class TimerAPI {
+  // 开始计时
+  static async startTimer(data: {
+    mode: 'explore' | 'utilize'
+    workId?: string
+    duration: number
+  }): Promise<TimerSession> {
+    return tauriInvoke<TimerSession>('start_timer', { data })
+  }
+
+  // 暂停计时
+  static async pauseTimer(sessionId: string): Promise<TimerSession> {
+    return tauriInvoke<TimerSession>('pause_timer', { sessionId })
+  }
+
+  // 恢复计时
+  static async resumeTimer(sessionId: string): Promise<TimerSession> {
+    return tauriInvoke<TimerSession>('resume_timer', { sessionId })
+  }
+
+  // 停止计时
+  static async stopTimer(sessionId: string): Promise<TimerSession> {
+    return tauriInvoke<TimerSession>('stop_timer', { sessionId })
+  }
+
+  // 获取计时器配置
+  static async getTimerConfig(): Promise<TimerConfig> {
+    return tauriInvoke<TimerConfig>('get_timer_config')
+  }
+
+  // 更新计时器配置
+  static async updateTimerConfig(config: Partial<TimerConfig>): Promise<TimerConfig> {
+    return tauriInvoke<TimerConfig>('update_timer_config', { config })
+  }
+
+  // 获取计时历史
+  static async getTimerHistory(workId?: string): Promise<TimerSession[]> {
+    return tauriInvoke<TimerSession[]>('get_timer_history', { workId })
+  }
+}
+
+// 分析相关API
+export class AnalyticsAPI {
+  // 获取分析数据
+  static async getAnalytics(params: {
+    startDate?: string
+    endDate?: string
+    workId?: string
+    mode?: 'explore' | 'utilize'
+  }): Promise<AnalyticsData> {
+    return tauriInvoke<AnalyticsData>('get_analytics', { params })
+  }
+
+  // 获取每日统计
+  static async getDailyStats(date: string): Promise<any> {
+    return tauriInvoke<any>('get_daily_stats', { date })
+  }
+
+  // 获取每周统计
+  static async getWeeklyStats(year: number, week: number): Promise<any> {
+    return tauriInvoke<any>('get_weekly_stats', { year, week })
+  }
+
+  // 获取每月统计
+  static async getMonthlyStats(year: number, month: number): Promise<any> {
+    return tauriInvoke<any>('get_monthly_stats', { year, month })
+  }
+
+  // 导出数据
+  static async exportData(params: {
+    format: 'json' | 'csv' | 'excel'
+    startDate?: string
+    endDate?: string
+    workId?: string
+  }): Promise<ExportData> {
+    return tauriInvoke<ExportData>('export_data', { params })
+  }
+}
+
+// 应用设置API
+export class SettingsAPI {
+  // 获取应用设置
+  static async getSettings(): Promise<any> {
+    return tauriInvoke<any>('get_settings')
+  }
+
+  // 更新应用设置
+  static async updateSettings(settings: any): Promise<any> {
+    return tauriInvoke<any>('update_settings', { settings })
+  }
+
+  // 获取用户偏好
+  static async getPreferences(): Promise<any> {
+    return tauriInvoke<any>('get_preferences')
+  }
+
+  // 更新用户偏好
+  static async updatePreferences(preferences: any): Promise<any> {
+    return tauriInvoke<any>('update_preferences', { preferences })
+  }
+
+  // 备份数据
+  static async backupData(): Promise<string> {
+    return tauriInvoke<string>('backup_data')
+  }
+
+  // 恢复数据
+  static async restoreData(backupPath: string): Promise<void> {
+    return tauriInvoke<void>('restore_data', { backupPath })
+  }
+}
+
+// 系统API
+export class SystemAPI {
+  // 检查更新
+  static async checkForUpdates(): Promise<any> {
+    return tauriInvoke<any>('check_for_updates')
+  }
+
+  // 下载更新
+  static async downloadUpdate(): Promise<void> {
+    return tauriInvoke<void>('download_update')
+  }
+
+  // 安装更新
+  static async installUpdate(): Promise<void> {
+    return tauriInvoke<void>('install_update')
+  }
+
+  // 获取系统信息
+  static async getSystemInfo(): Promise<any> {
+    return tauriInvoke<any>('get_system_info')
+  }
+
+  // 显示通知
+  static async showNotification(title: string, body: string): Promise<void> {
+    return tauriInvoke<void>('show_notification', { title, body })
+  }
+}
+
+// 错误处理
+export class APIError extends Error {
+  constructor(
+    public code: string,
+    message: string,
+    public details?: any
+  ) {
+    super(message)
+    this.name = 'APIError'
+  }
+}
+
+// 导出所有API
+export {
+  WorksAPI,
+  TimerAPI,
+  AnalyticsAPI,
+  SettingsAPI,
+  SystemAPI,
+  APIError
+}
