@@ -1,6 +1,7 @@
 export type ThemeMode = 'light' | 'dark' | 'system';
+export type AppState = 'loading' | 'ready' | 'error';
 
-export interface AppState {
+export interface AppStateData {
   theme: ThemeMode;
   sidebar_open: boolean;
   float_window_visible: boolean;
@@ -13,6 +14,7 @@ export interface AppState {
   online: boolean;
   error: string | null;
 }
+
 
 export interface ToastMessage {
   id: string;

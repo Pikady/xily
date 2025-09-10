@@ -8,7 +8,7 @@ import {
   FolderOpen, 
   Timer, 
   BarChart3, 
-  Settings,
+  Settings as SettingsIcon,
   ChevronLeft,
   ChevronRight,
   Menu
@@ -19,7 +19,7 @@ const menuItems = [
   { path: '/works', label: '作品管理', icon: FolderOpen },
   { path: '/timer', label: '计时器', icon: Timer },
   { path: '/analytics', label: '数据分析', icon: BarChart3 },
-  { path: '/settings', label: '设置', icon: Settings },
+  { path: '/settings', label: '设置', icon: SettingsIcon },
 ];
 
 interface SidebarProps {

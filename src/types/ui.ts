@@ -1,3 +1,6 @@
+// 重新导出前端类型
+export type { UIState, ViewMode, WorkFormData, AnalyticsData, UserPreferences, ToastMessage, ModalState } from './frontend';
+
 export type ButtonVariant = 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link' | 'explore' | 'utilize';
 export type ButtonSize = 'default' | 'sm' | 'lg' | 'icon';
 

@@ -1,15 +1,18 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { TimerState, TimerConfig, TimerSession } from '@/types/timer'
+import { TimerState, TimerConfig, TimerSession, TimerMode } from '@/types/timer'
+import { TimerAPI } from '@/services/api'
 import { immer } from 'zustand/middleware/immer'
 
 interface TimerStoreState {
   // 状态
   state: TimerState
-  mode: 'explore' | 'utilize'
+  mode: TimerMode
   config: TimerConfig
   currentSession: TimerSession | null
   sessionHistory: TimerSession[]
+  loading: boolean
+  error: string | null
   
   // 计时器数据
   remainingTime: number
@@ -18,16 +21,19 @@ interface TimerStoreState {
   pauseTime: number | null
   
   // Actions
-  startTimer: (mode: 'explore' | 'utilize', workId?: string) => void
-  pauseTimer: () => void
-  resumeTimer: () => void
+  startTimer: (mode: TimerMode, workId?: number) => Promise<void>
+  pauseTimer: () => Promise<void>
+  resumeTimer: () => Promise<void>
   stopTimer: () => Promise<void>
   resetTimer: () => void
-  updateConfig: (config: Partial<TimerConfig>) => void
-  setMode: (mode: 'explore' | 'utilize') => void
+  updateConfig: (config: Partial<TimerConfig>) => Promise<void>
+  setMode: (mode: TimerMode) => void
   tick: () => void
   completeSession: () => Promise<void>
+  fetchTimerHistory: (workId?: number) => Promise<void>
   clearHistory: () => void
+  setLoading: (loading: boolean) => void
+  setError: (error: string | null) => void
 }
 
 export const useTimerStore = create<TimerStoreState>()(
@@ -37,115 +43,166 @@ export const useTimerStore = create<TimerStoreState>()(
       state: 'idle',
       mode: 'explore',
       config: {
-        focusTime: 25,
+        focusDuration: 25,
         shortBreak: 5,
         longBreak: 15,
-        longBreakInterval: 4,
-        autoStartBreak: false,
-        autoStartFocus: false,
+        autoStartBreaks: false,
+        autoStartPomodoros: false,
         soundEnabled: true,
         notificationEnabled: true
       },
       currentSession: null,
       sessionHistory: [],
+      loading: false,
+      error: null,
       remainingTime: 25 * 60, // 25分钟
       isRunning: false,
       startTime: null,
       pauseTime: null,
 
-      startTimer: (mode: 'explore' | 'utilize', workId?: string) => {
-        const state = get()
-        const duration = state.config.focusTime * 60
-        
-        set((draft) => {
-          draft.state = 'running'
-          draft.mode = mode
-          draft.isRunning = true
-          draft.startTime = Date.now()
-          draft.pauseTime = null
-          draft.remainingTime = duration
+      startTimer: async (mode: TimerMode, workId?: number) => {
+        try {
+          set({ loading: true, error: null })
           
-          // 创建新的会话
-          draft.currentSession = {
-            id: Date.now().toString(),
-            type: 'focus',
+          const duration = get().config.focusDuration
+          const session = await TimerAPI.startTimer({
             mode,
-            duration,
-            startTime: new Date().toISOString(),
-            endTime: null,
-            isCompleted: false,
-            workId
-          }
-        })
-      },
-
-      pauseTimer: () => {
-        set((draft) => {
-          draft.state = 'paused'
-          draft.isRunning = false
-          draft.pauseTime = Date.now()
-          if (draft.currentSession) {
-            draft.currentSession.pauseTime = new Date().toISOString()
-          }
-        })
-      },
-
-      resumeTimer: () => {
-        const state = get()
-        if (state.pauseTime && state.currentSession?.pauseTime) {
-          const pauseDuration = Date.now() - state.pauseTime
+            workId: workId?.toString(),
+            duration
+          })
           
           set((draft) => {
             draft.state = 'running'
+            draft.mode = mode
             draft.isRunning = true
-            draft.startTime = (draft.startTime || 0) + pauseDuration
+            draft.startTime = Date.now()
             draft.pauseTime = null
-            if (draft.currentSession) {
-              draft.currentSession.resumeTime = new Date().toISOString()
-            }
+            draft.remainingTime = duration * 60
+            draft.currentSession = session
+            draft.loading = false
           })
+        } catch (error) {
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to start timer',
+            loading: false 
+          })
+          throw error
+        }
+      },
+
+      pauseTimer: async () => {
+        try {
+          set({ loading: true, error: null })
+          
+          if (get().currentSession) {
+            const session = await TimerAPI.pauseTimer(get().currentSession!.id)
+            
+            set((draft) => {
+              draft.state = 'paused'
+              draft.isRunning = false
+              draft.pauseTime = Date.now()
+              draft.currentSession = session
+              draft.loading = false
+            })
+          }
+        } catch (error) {
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to pause timer',
+            loading: false 
+          })
+          throw error
+        }
+      },
+
+      resumeTimer: async () => {
+        try {
+          set({ loading: true, error: null })
+          
+          if (get().currentSession) {
+            const session = await TimerAPI.resumeTimer(get().currentSession!.id)
+            
+            const state = get()
+            if (state.pauseTime) {
+              const pauseDuration = Date.now() - state.pauseTime
+              
+              set((draft) => {
+                draft.state = 'running'
+                draft.isRunning = true
+                draft.startTime = (draft.startTime || 0) + pauseDuration
+                draft.pauseTime = null
+                draft.currentSession = session
+                draft.loading = false
+              })
+            }
+          }
+        } catch (error) {
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to resume timer',
+            loading: false 
+          })
+          throw error
         }
       },
 
       stopTimer: async () => {
-        const state = get()
-        
-        if (state.currentSession) {
-          // 完成当前会话
-          await get().completeSession()
+        try {
+          set({ loading: true, error: null })
+          
+          if (get().currentSession) {
+            await TimerAPI.stopTimer(get().currentSession!.id)
+            await get().completeSession()
+          }
+          
+          set((draft) => {
+            draft.state = 'idle'
+            draft.isRunning = false
+            draft.startTime = null
+            draft.pauseTime = null
+            draft.remainingTime = draft.config.focusDuration * 60
+            draft.currentSession = null
+            draft.loading = false
+          })
+        } catch (error) {
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to stop timer',
+            loading: false 
+          })
+          throw error
         }
-        
-        set((draft) => {
-          draft.state = 'idle'
-          draft.isRunning = false
-          draft.startTime = null
-          draft.pauseTime = null
-          draft.remainingTime = draft.config.focusTime * 60
-          draft.currentSession = null
-        })
       },
 
       resetTimer: () => {
-        const state = get()
-        const duration = state.config.focusTime * 60
+        const duration = get().config.focusDuration
         
         set((draft) => {
           draft.state = 'idle'
           draft.isRunning = false
           draft.startTime = null
           draft.pauseTime = null
-          draft.remainingTime = duration
+          draft.remainingTime = duration * 60
           draft.currentSession = null
         })
       },
 
-      updateConfig: (config: Partial<TimerConfig>) => {
-        set((draft) => {
-          draft.config = { ...draft.config, ...config }
-        })
+      updateConfig: async (config: Partial<TimerConfig>) => {
+        try {
+          set({ loading: true, error: null })
+          const updatedConfig = await TimerAPI.updateTimerConfig(config)
+          
+          set((draft) => {
+            draft.config = updatedConfig
+            draft.loading = false
+          })
+        } catch (error) {
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to update config',
+            loading: false 
+          })
+          throw error
+        }
       },
 
-      setMode: (mode: 'explore' | 'utilize') => {
+      setMode: (mode: TimerMode) => {
         set((draft) => {
           draft.mode = mode
         })
@@ -156,53 +213,88 @@ export const useTimerStore = create<TimerStoreState>()(
         if (!state.isRunning || state.state !== 'running') return
 
         const elapsed = Math.floor((Date.now() - (state.startTime || 0)) / 1000)
-        const newRemainingTime = Math.max(0, (state.config.focusTime * 60) - elapsed)
+        const newRemainingTime = Math.max(0, (state.config.focusDuration * 60) - elapsed)
 
         set((draft) => {
           draft.remainingTime = newRemainingTime
           
           if (newRemainingTime === 0 && draft.currentSession) {
-            // 计时器结束
             draft.state = 'completed'
             draft.isRunning = false
-            draft.currentSession.endTime = new Date().toISOString()
-            draft.currentSession.isCompleted = true
           }
         })
 
-        // 自动处理计时器结束
+        // 自动处理计时器结束 - 使用更可靠的方式
         if (newRemainingTime === 0) {
-          setTimeout(() => get().completeSession(), 100)
+          // 使用 requestAnimationFrame 避免竞态条件
+          requestAnimationFrame(() => {
+            const currentState = get()
+            if (currentState.state === 'completed' && currentState.remainingTime === 0) {
+              get().completeSession().catch(console.error)
+            }
+          })
         }
       },
 
       completeSession: async () => {
-        const state = get()
-        
-        if (state.currentSession) {
-          const completedSession = {
-            ...state.currentSession,
-            endTime: new Date().toISOString(),
-            isCompleted: true
-          }
+        try {
+          const state = get()
           
-          // TODO: 调用API保存会话记录
+          if (state.currentSession) {
+            // 停止计时器会话
+            await TimerAPI.stopTimer(state.currentSession.id)
+            
+            set((draft) => {
+              if (state.currentSession) {
+                draft.sessionHistory.push(state.currentSession)
+              }
+              draft.currentSession = null
+              draft.state = 'idle'
+              draft.isRunning = false
+              draft.remainingTime = draft.config.focusDuration * 60
+            })
+          }
+        } catch (error) {
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to complete session'
+          })
+          throw error
+        }
+      },
+
+      fetchTimerHistory: async (workId?: number) => {
+        try {
+          set({ loading: true, error: null })
+          const history = await TimerAPI.getTimerHistory(workId?.toString())
           
           set((draft) => {
-            if (completedSession.workId) {
-              draft.sessionHistory.push(completedSession)
-            }
-            draft.currentSession = null
-            draft.state = 'idle'
-            draft.isRunning = false
-            draft.remainingTime = draft.config.focusTime * 60
+            draft.sessionHistory = history
+            draft.loading = false
           })
+        } catch (error) {
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to fetch timer history',
+            loading: false 
+          })
+          throw error
         }
       },
 
       clearHistory: () => {
         set((draft) => {
           draft.sessionHistory = []
+        })
+      },
+
+      setLoading: (loading: boolean) => {
+        set((draft) => {
+          draft.loading = loading
+        })
+      },
+
+      setError: (error: string | null) => {
+        set((draft) => {
+          draft.error = error
         })
       }
     })),

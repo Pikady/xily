@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { UIState, ThemeMode, ViewMode } from '@/types/ui'
+import { UIState, ViewMode } from '@/types/ui'
+import { ThemeMode } from '@/types/app'
 import { immer } from 'zustand/middleware/immer'
 
 interface UIStoreState {
@@ -87,7 +88,7 @@ export const useUIStore = create<UIStoreState>()(
       theme: 'light',
       sidebarCollapsed: false,
       headerVisible: true,
-      viewMode: 'dashboard',
+      viewMode: 'grid',
       
       floatWindow: {
         visible: false,

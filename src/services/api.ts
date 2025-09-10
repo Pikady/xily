@@ -1,7 +1,8 @@
 import { invoke } from '@tauri-apps/api/core'
-import { Work, WorkFormData, WorkStats } from '@/types/work'
+import { Work, WorkStats } from '@/types/work'
 import { TimerSession, TimerConfig } from '@/types/timer'
-import { AnalyticsData, ExportData } from '@/types/analytics'
+import { ExportData } from '@/types/analytics'
+import { WorkFormData, AnalyticsData } from '@/types/frontend'
 
 // API响应基础类型
 interface ApiResponse<T> {
@@ -22,31 +23,6 @@ const API_CONFIG = {
   timeout: 10000,
   retries: 3,
   retryDelay: 1000
-}
-
-// 通用API请求函数
-async function apiRequest<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<ApiResponse<T>> {
-  try {
-    const response = await fetch(`/api${endpoint}`, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-      }
-    })
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-    }
-
-    return await response.json()
-  } catch (error) {
-    console.error(`API请求失败: ${endpoint}`, error)
-    throw error
-  }
 }
 
 // Tauri命令调用包装器
@@ -78,17 +54,17 @@ export class WorksAPI {
 
   // 更新作品
   static async updateWork(id: string, workData: Partial<WorkFormData>): Promise<Work> {
-    return tauriInvoke<Work>('update_work', { id, workData })
+    return tauriInvoke<Work>('update_work', { id: parseInt(id), workData })
   }
 
   // 删除作品
   static async deleteWork(id: string): Promise<void> {
-    return tauriInvoke<void>('delete_work', { id })
+    return tauriInvoke<void>('delete_work', { id: parseInt(id) })
   }
 
   // 获取作品统计
   static async getWorkStats(id: string): Promise<WorkStats> {
-    return tauriInvoke<WorkStats>('get_work_stats', { id })
+    return tauriInvoke<WorkStats>('get_work_stats', { id: parseInt(id) })
   }
 
   // 获取所有作品统计
@@ -102,24 +78,24 @@ export class TimerAPI {
   // 开始计时
   static async startTimer(data: {
     mode: 'explore' | 'utilize'
-    workId?: string
+    workId?: number
     duration: number
   }): Promise<TimerSession> {
     return tauriInvoke<TimerSession>('start_timer', { data })
   }
 
   // 暂停计时
-  static async pauseTimer(sessionId: string): Promise<TimerSession> {
+  static async pauseTimer(sessionId: number): Promise<TimerSession> {
     return tauriInvoke<TimerSession>('pause_timer', { sessionId })
   }
 
   // 恢复计时
-  static async resumeTimer(sessionId: string): Promise<TimerSession> {
+  static async resumeTimer(sessionId: number): Promise<TimerSession> {
     return tauriInvoke<TimerSession>('resume_timer', { sessionId })
   }
 
   // 停止计时
-  static async stopTimer(sessionId: string): Promise<TimerSession> {
+  static async stopTimer(sessionId: number): Promise<TimerSession> {
     return tauriInvoke<TimerSession>('stop_timer', { sessionId })
   }
 
@@ -134,7 +110,7 @@ export class TimerAPI {
   }
 
   // 获取计时历史
-  static async getTimerHistory(workId?: string): Promise<TimerSession[]> {
+  static async getTimerHistory(workId?: number): Promise<TimerSession[]> {
     return tauriInvoke<TimerSession[]>('get_timer_history', { workId })
   }
 }
@@ -145,7 +121,7 @@ export class AnalyticsAPI {
   static async getAnalytics(params: {
     startDate?: string
     endDate?: string
-    workId?: string
+    workId?: number
     mode?: 'explore' | 'utilize'
   }): Promise<AnalyticsData> {
     return tauriInvoke<AnalyticsData>('get_analytics', { params })
@@ -168,10 +144,10 @@ export class AnalyticsAPI {
 
   // 导出数据
   static async exportData(params: {
-    format: 'json' | 'csv' | 'excel'
+    format: 'json' | 'csv' | 'pdf'
     startDate?: string
     endDate?: string
-    workId?: string
+    workId?: number
   }): Promise<ExportData> {
     return tauriInvoke<ExportData>('export_data', { params })
   }
@@ -250,12 +226,3 @@ export class APIError extends Error {
   }
 }
 
-// 导出所有API
-export {
-  WorksAPI,
-  TimerAPI,
-  AnalyticsAPI,
-  SettingsAPI,
-  SystemAPI,
-  APIError
-}

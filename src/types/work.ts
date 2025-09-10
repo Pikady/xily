@@ -15,6 +15,7 @@ export interface CreateWorkParams {
   target_hours: number;
 }
 
+
 export interface UpdateWorkParams extends Partial<CreateWorkParams> {
   id: number;
 }

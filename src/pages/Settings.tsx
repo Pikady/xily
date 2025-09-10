@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Settings, Bell, Clock, Palette, Monitor, Download, Info } from 'lucide-react';
+import { Settings as SettingsIcon, Bell, Clock, Palette, Monitor, Download, Info } from 'lucide-react';
 
 export function Settings() {
   return (
@@ -21,7 +21,7 @@ export function Settings() {
           <Card>
             <CardContent className="p-2">
               <Button variant="default" className="w-full justify-start">
-                <Settings className="w-4 h-4 mr-2" />
+                <SettingsIcon className="w-4 h-4 mr-2" />
                 通用设置
               </Button>
               <Button variant="ghost" className="w-full justify-start">

@@ -1,26 +1,43 @@
 import React from 'react';
-import { useApp } from '@/contexts/AppContext';
+import { useUIStore } from '@/stores/uiStore';
+import { useAppStore } from '@/stores/appStore';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { FloatWindow } from '@/components/timer/FloatWindow';
+import { useFloatWindow } from '@/hooks/useFloatWindow';
 
 interface AppLayoutProps {
   children: React.ReactNode;
 }
 
 export function AppLayout({ children }: AppLayoutProps) {
-  const { state } = useApp();
+  const { sidebarCollapsed } = useUIStore();
+  const { 
+    isVisible: isFloatWindowVisible, 
+    toggleFloatWindow, 
+    expandFloatWindow 
+  } = useFloatWindow();
 
   return (
-    <div className="flex h-screen bg-background">
-      <Sidebar isOpen={state.sidebar_open} />
-      
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
+    <>
+      <div className="flex h-screen bg-background">
+        <Sidebar isOpen={!sidebarCollapsed} />
         
-        <main className="flex-1 overflow-auto p-6">
-          {children}
-        </main>
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <Header />
+          
+          <main className="flex-1 overflow-auto p-6">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+
+      {/* 悬浮窗 */}
+      <FloatWindow
+        isVisible={isFloatWindowVisible}
+        onToggleVisibility={toggleFloatWindow}
+        onExpand={expandFloatWindow}
+      />
+    </>
   );
 }

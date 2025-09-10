@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import { AppState, ThemeMode } from '@/types/app';
+import { AppStateData, ThemeMode } from '@/types/app';
 
 type AppAction =
   | { type: 'SET_THEME'; payload: ThemeMode }
@@ -12,7 +12,7 @@ type AppAction =
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'SET_ACTIVE_MODAL'; payload: string | null };
 
-const initialState: AppState = {
+const initialState: AppStateData = {
   theme: 'system',
   sidebar_open: true,
   float_window_visible: false,
@@ -23,7 +23,7 @@ const initialState: AppState = {
   error: null,
 };
 
-function appReducer(state: AppState, action: AppAction): AppState {
+function appReducer(state: AppStateData, action: AppAction): AppStateData {
   switch (action.type) {
     case 'SET_THEME':
       return { ...state, theme: action.payload };
@@ -49,7 +49,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
 }
 
 const AppContext = createContext<{
-  state: AppState;
+  state: AppStateData;
   dispatch: React.Dispatch<AppAction>;
 } | null>(null);
 
