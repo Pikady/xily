@@ -252,7 +252,7 @@ export const useUIStore = create<UIStoreState>()(
           draft.theme = 'light'
           draft.sidebarCollapsed = false
           draft.headerVisible = true
-          draft.viewMode = 'dashboard'
+          draft.viewMode = 'grid'
           draft.floatWindow = {
             visible: false,
             position: { x: 100, y: 100 },

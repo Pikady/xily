@@ -43,7 +43,14 @@ export default defineConfig(async () => ({
     outDir: 'dist',
     sourcemap: true,
     rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+        float: path.resolve(__dirname, 'float.html'),
+      },
       output: {
+        entryFileNames: (chunkInfo) => {
+          return chunkInfo.name === 'float' ? 'float-[hash].js' : '[name]-[hash].js'
+        },
         manualChunks: {
           vendor: ['react', 'react-dom'],
           radix: ['@radix-ui/react-slot', '@radix-ui/react-dialog'],

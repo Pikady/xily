@@ -65,9 +65,15 @@ export const useTimerStore = create<TimerStoreState>()(
           set({ loading: true, error: null })
           
           const duration = get().config.focusDuration
+          
+          // 如果没有选择作品，显示提示但允许继续
+          if (!workId) {
+            console.log('未选择作品，将开始无归属的计时')
+          }
+          
           const session = await TimerAPI.startTimer({
             mode,
-            workId: workId?.toString(),
+            workId,
             duration
           })
           

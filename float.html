@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="/src/styles/globals.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>汐律悬浮窗</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background: transparent;
+        overflow: hidden;
+      }
+      
+      #float-root {
+        width: 100%;
+        height: 100%;
+        min-height: 200px;
+        background: rgba(255, 255, 255, 0.95);
+        border: 2px solid #3b82f6;
+        border-radius: 8px;
+      }
+    </style>
+  </head>
+  
+  <body>
+    <div id="float-root"></div>
+    <script type="module" src="/src/float-window.tsx" defer></script>
+  </body>
+</html>

@@ -1,42 +1,82 @@
 import { useState, useEffect } from 'react'
+import { WindowAPI } from '@/services/api'
+
+interface Position {
+  x: number
+  y: number
+}
 
 interface FloatWindowManager {
   isVisible: boolean
-  showFloatWindow: () => void
-  hideFloatWindow: () => void
-  toggleFloatWindow: () => void
+  position: Position
+  showFloatWindow: () => Promise<void>
+  hideFloatWindow: () => Promise<void>
+  toggleFloatWindow: () => Promise<void>
   expandFloatWindow: () => void
+  setFloatWindowPosition: (x: number, y: number) => Promise<void>
 }
 
 export const useFloatWindow = (): FloatWindowManager => {
   const [isVisible, setIsVisible] = useState(false)
+  const [position, setPosition] = useState<Position>({ x: 100, y: 100 })
 
-  // 从localStorage恢复状态
+  // 初始化悬浮窗状态
   useEffect(() => {
-    const savedState = localStorage.getItem('float-window-visible')
-    if (savedState !== null) {
-      setIsVisible(savedState === 'true')
+    const initFloatWindow = async () => {
+      try {
+        const visible = await WindowAPI.isFloatWindowVisible()
+        setIsVisible(visible)
+        
+        const pos = await WindowAPI.getFloatWindowPosition()
+        if (pos) {
+          setPosition(pos)
+        }
+      } catch (error) {
+        console.error('初始化悬浮窗状态失败:', error)
+      }
     }
+    
+    initFloatWindow()
   }, [])
 
-  // 保存状态到localStorage
-  useEffect(() => {
-    localStorage.setItem('float-window-visible', isVisible.toString())
-  }, [isVisible])
-
   // 显示悬浮窗
-  const showFloatWindow = () => {
-    setIsVisible(true)
+  const showFloatWindow = async () => {
+    try {
+      await WindowAPI.showFloatWindow()
+      setIsVisible(true)
+    } catch (error) {
+      console.error('显示悬浮窗失败:', error)
+    }
   }
 
   // 隐藏悬浮窗
-  const hideFloatWindow = () => {
-    setIsVisible(false)
+  const hideFloatWindow = async () => {
+    try {
+      await WindowAPI.hideFloatWindow()
+      setIsVisible(false)
+    } catch (error) {
+      console.error('隐藏悬浮窗失败:', error)
+    }
   }
 
   // 切换悬浮窗显示状态
-  const toggleFloatWindow = () => {
-    setIsVisible(prev => !prev)
+  const toggleFloatWindow = async () => {
+    try {
+      await WindowAPI.toggleFloatWindow()
+      setIsVisible(prev => !prev)
+    } catch (error) {
+      console.error('切换悬浮窗失败:', error)
+    }
+  }
+
+  // 设置悬浮窗位置
+  const setFloatWindowPosition = async (x: number, y: number) => {
+    try {
+      await WindowAPI.setFloatWindowPosition(x, y)
+      setPosition({ x, y })
+    } catch (error) {
+      console.error('设置悬浮窗位置失败:', error)
+    }
   }
 
   // 展开悬浮窗（跳转到完整页面）
@@ -47,10 +87,12 @@ export const useFloatWindow = (): FloatWindowManager => {
 
   return {
     isVisible,
+    position,
     showFloatWindow,
     hideFloatWindow,
     toggleFloatWindow,
-    expandFloatWindow
+    expandFloatWindow,
+    setFloatWindowPosition
   }
 }
 

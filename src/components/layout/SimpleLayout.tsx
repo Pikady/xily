@@ -1,11 +1,16 @@
 import React from 'react';
 import { Outlet, Link } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Timer } from 'lucide-react';
+import { useFloatWindow } from '@/hooks/useFloatWindow';
 
 interface SimpleLayoutProps {
   children: React.ReactNode;
 }
 
 export function SimpleLayout({ children }: SimpleLayoutProps) {
+  const { toggleFloatWindow } = useFloatWindow();
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b">
@@ -18,7 +23,16 @@ export function SimpleLayout({ children }: SimpleLayoutProps) {
               <Link to="/dashboard" className="text-gray-600 hover:text-gray-900">仪表板</Link>
               <Link to="/timer" className="text-gray-600 hover:text-gray-900">计时器</Link>
               <Link to="/works" className="text-gray-600 hover:text-gray-900">作品</Link>
+              <Link to="/analytics" className="text-gray-600 hover:text-gray-900">分析</Link>
               <Link to="/settings" className="text-gray-600 hover:text-gray-900">设置</Link>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleFloatWindow}
+              >
+                <Timer className="w-4 h-4 mr-2" />
+                悬浮窗
+              </Button>
             </nav>
           </div>
         </div>

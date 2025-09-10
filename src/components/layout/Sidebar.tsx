@@ -69,7 +69,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
                         ? "bg-primary text-primary-foreground" 
                         : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                     )}
-                  >
+                      >
                     <item.icon size={18} />
                     {isOpen && <span>{item.label}</span>}
                   </Link>

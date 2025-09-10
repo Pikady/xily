@@ -3,16 +3,16 @@ import { useApp } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { Bell, Settings, User, Moon, Sun, Timer } from 'lucide-react';
 
-export function Header() {
+interface HeaderProps {
+  onToggleFloatWindow: () => Promise<void>;
+}
+
+export function Header({ onToggleFloatWindow }: HeaderProps) {
   const { state, dispatch } = useApp();
 
   const toggleTheme = () => {
     const newTheme = state.theme === 'light' ? 'dark' : 'light';
     dispatch({ type: 'SET_THEME', payload: newTheme });
-  };
-
-  const toggleFloatWindow = () => {
-    dispatch({ type: 'TOGGLE_FLOAT_WINDOW' });
   };
 
   return (
@@ -29,7 +29,7 @@ export function Header() {
           <Button
             variant="outline"
             size="sm"
-            onClick={toggleFloatWindow}
+            onClick={onToggleFloatWindow}
           >
             <Timer className="w-4 h-4 mr-2" />
             悬浮窗

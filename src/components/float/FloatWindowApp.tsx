@@ -1,48 +1,32 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { useTimer } from '@/hooks/useTimer'
 import { useWorks } from '@/hooks/useWorks'
-import { useApp } from '@/contexts/AppContext'
+import { WindowAPI } from '@/services/api'
 import { TimerMode } from '@/types/timer'
 import { 
   Play, 
   Pause, 
   Square, 
-  Maximize2, 
   Minimize2,
   X,
   BookOpen,
-  Zap,
-  GripVertical
+  Zap
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-
-interface FloatWindowProps {
-  isVisible: boolean
-  onToggleVisibility: () => void
-  onExpand?: () => void
-  className?: string
-}
 
 interface Position {
   x: number
   y: number
 }
 
-export function FloatWindow({ 
-  isVisible, 
-  onToggleVisibility, 
-  onExpand,
-  className = '' 
-}: FloatWindowProps) {
-  const [isDragging, setIsDragging] = useState(false)
+export function FloatWindowApp() {
   const [isMinimized, setIsMinimized] = useState(false)
+  const [position, setPosition] = useState<Position>({ x: 100, y: 100 })
+  const [isDragging, setIsDragging] = useState(false)
   const [dragOffset, setDragOffset] = useState<Position>({ x: 0, y: 0 })
-  
-  const windowRef = useRef<HTMLDivElement>(null)
-  const dragHandleRef = useRef<HTMLDivElement>(null)
   
   const {
     timerState,
@@ -58,36 +42,47 @@ export function FloatWindow({
   } = useTimer()
   
   const { currentWork } = useWorks()
-  const { state, dispatch } = useApp()
 
-  // 位置从 AppContext 获取
-  const position = state.float_window_position
+  // 初始化位置
+  useEffect(() => {
+    const loadPosition = async () => {
+      try {
+        const savedPosition = await WindowAPI.getFloatWindowPosition()
+        if (savedPosition) {
+          setPosition(savedPosition)
+        }
+      } catch (error) {
+        console.error('加载悬浮窗位置失败:', error)
+      }
+    }
+    
+    loadPosition()
+  }, [])
 
-  // 保存位置到 AppContext
-  const savePosition = (pos: Position) => {
-    dispatch({ type: 'SET_FLOAT_WINDOW_POSITION', payload: pos })
-  }
+  // 保存位置
+  const savePosition = useCallback(async (pos: Position) => {
+    setPosition(pos)
+    try {
+      await WindowAPI.setFloatWindowPosition(pos.x, pos.y)
+    } catch (error) {
+      console.error('保存悬浮窗位置失败:', error)
+    }
+  }, [])
 
   // 处理鼠标按下（开始拖拽）
   const handleMouseDown = (e: React.MouseEvent) => {
-    console.log('Mouse down on float window')
-    
     // 如果点击的是按钮，不触发拖拽
     if ((e.target as HTMLElement).closest('button')) {
-      console.log('Clicked on button, not dragging')
       return
     }
     
     e.preventDefault()
     setIsDragging(true)
     
-    const rect = windowRef.current?.getBoundingClientRect()
-    if (rect) {
-      const offsetX = e.clientX - rect.left
-      const offsetY = e.clientY - rect.top
-      setDragOffset({ x: offsetX, y: offsetY })
-      console.log('Starting drag:', { offsetX, offsetY, clientX: e.clientX, clientY: e.clientY, rectLeft: rect.left, rectTop: rect.top })
-    }
+    const rect = e.currentTarget.getBoundingClientRect()
+    const offsetX = e.clientX - rect.left
+    const offsetY = e.clientY - rect.top
+    setDragOffset({ x: offsetX, y: offsetY })
     
     document.body.style.cursor = 'grabbing'
     document.body.style.userSelect = 'none'
@@ -95,35 +90,17 @@ export function FloatWindow({
 
   // 处理鼠标移动（拖拽中）
   const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isDragging || !windowRef.current) return
+    if (!isDragging) return
     
     const newX = e.clientX - dragOffset.x
     const newY = e.clientY - dragOffset.y
     
-    // 移除边界限制，允许悬浮窗移动到窗口外部
-    // 如果需要部分限制，可以在这里调整
-    // const rect = windowRef.current.getBoundingClientRect()
-    // const maxX = window.innerWidth - rect.width
-    // const maxY = window.innerHeight - rect.height
-    // const constrainedX = Math.max(0, Math.min(newX, maxX))
-    // const constrainedY = Math.max(0, Math.min(newY, maxY))
-    
-    console.log('Dragging to:', { 
-      clientX: e.clientX, 
-      clientY: e.clientY, 
-      dragOffsetX: dragOffset.x, 
-      dragOffsetY: dragOffset.y,
-      newX, newY
-    })
-    
-    // 直接更新到 AppContext，不限制位置
     savePosition({ x: newX, y: newY })
   }, [isDragging, dragOffset, savePosition])
 
   // 处理鼠标释放（结束拖拽）
   const handleMouseUp = useCallback(() => {
     if (isDragging) {
-      console.log('Ending drag')
       setIsDragging(false)
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
@@ -161,20 +138,18 @@ export function FloatWindow({
     await stopTimer()
   }
 
+  // 关闭悬浮窗
+  const handleClose = async () => {
+    try {
+      await WindowAPI.hideFloatWindow()
+    } catch (error) {
+      console.error('关闭悬浮窗失败:', error)
+    }
+  }
+
   // 切换最小化
   const toggleMinimize = () => {
     setIsMinimized(!isMinimized)
-  }
-
-  // 关闭悬浮窗
-  const handleClose = () => {
-    onToggleVisibility()
-  }
-
-  // 展开到完整页面
-  const handleExpand = () => {
-    onExpand?.()
-    onToggleVisibility()
   }
 
   // 获取模式颜色
@@ -189,41 +164,20 @@ export function FloatWindow({
     return mode === 'explore' ? <BookOpen className="w-3 h-3" /> : <Zap className="w-3 h-3" />
   }
 
-  // 添加调试信息
-  console.log('FloatWindow render:', { isVisible, position, isMinimized })
-
-  if (!isVisible) {
-    console.log('FloatWindow is hidden')
-    return null
-  }
-
   return (
     <div
-      ref={windowRef}
       className={cn(
-        'fixed z-[9999] transition-all duration-200 cursor-grab active:cursor-grabbing',
-        isMinimized ? 'w-64 h-16' : 'w-80',
-        isDragging ? 'opacity-90 shadow-2xl' : 'opacity-100 shadow-lg',
-        className
+        'w-full h-full transition-all duration-200 cursor-grab active:cursor-grabbing',
+        isMinimized ? 'min-h-[64px]' : 'min-h-[200px]',
+        isDragging ? 'opacity-90' : 'opacity-100'
       )}
-      style={{
-        left: `${position.x}px`,
-        top: `${position.y}px`,
-        transform: isDragging ? 'scale(1.02)' : 'scale(1)',
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        border: '2px solid #3b82f6'
-      }}
       onMouseDown={handleMouseDown}
     >
       <Card className="h-full border-2 bg-background/95 backdrop-blur-sm">
         <CardContent className="p-0 h-full">
           {/* 拖拽手柄 */}
-          <div
-            ref={dragHandleRef}
-            className="flex items-center justify-between p-3 border-b bg-muted/50"
-          >
+          <div className="flex items-center justify-between p-3 border-b bg-muted/50">
             <div className="flex items-center space-x-2">
-              <GripVertical className="w-4 h-4 text-muted-foreground" />
               <div className="flex items-center space-x-1">
                 <div className={cn(
                   'w-2 h-2 rounded-full',
@@ -242,15 +196,7 @@ export function FloatWindow({
                 onClick={toggleMinimize}
                 className="h-6 w-6 p-0"
               >
-                {isMinimized ? <Maximize2 className="w-3 h-3" /> : <Minimize2 className="w-3 h-3" />}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleExpand}
-                className="h-6 w-6 p-0"
-              >
-                <Maximize2 className="w-3 h-3" />
+                <Minimize2 className="w-3 h-3" />
               </Button>
               <Button
                 variant="ghost"

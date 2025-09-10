@@ -39,22 +39,41 @@ async function tauriInvoke<T>(command: string, args?: any): Promise<T> {
 export class WorksAPI {
   // 获取所有作品
   static async getAllWorks(): Promise<Work[]> {
-    return tauriInvoke<Work[]>('get_all_works')
+    return tauriInvoke<Work[]>('get_works')
   }
 
   // 获取单个作品
   static async getWork(id: string): Promise<Work> {
-    return tauriInvoke<Work>('get_work', { id })
+    return tauriInvoke<Work>('get_work', { id: parseInt(id) })
   }
 
   // 创建作品
   static async createWork(workData: WorkFormData): Promise<Work> {
-    return tauriInvoke<Work>('create_work', { workData })
+    return tauriInvoke<Work>('create_work', { 
+      name: workData.name,
+      description: workData.description,
+      color: workData.color,
+      target_hours: workData.target_hours
+    })
   }
 
   // 更新作品
   static async updateWork(id: string, workData: Partial<WorkFormData>): Promise<Work> {
-    return tauriInvoke<Work>('update_work', { id: parseInt(id), workData })
+    // 首先获取现有作品数据
+    const existingWork = await WorksAPI.getWork(id)
+    
+    // 构造完整的Work对象
+    const work: Work = {
+      id: parseInt(id),
+      name: workData.name || existingWork.name,
+      description: workData.description !== undefined ? workData.description : existingWork.description,
+      color: workData.color !== undefined ? workData.color : existingWork.color,
+      target_hours: workData.targetHours !== undefined ? workData.targetHours : existingWork.target_hours,
+      created_at: existingWork.created_at,
+      updated_at: new Date(),
+      is_archived: existingWork.is_archived
+    }
+    return tauriInvoke<Work>('update_work', work)
   }
 
   // 删除作品
@@ -81,22 +100,26 @@ export class TimerAPI {
     workId?: number
     duration: number
   }): Promise<TimerSession> {
-    return tauriInvoke<TimerSession>('start_timer', { data })
+    return tauriInvoke<TimerSession>('start_timer', { 
+      work_id: data.workId, // 现在支持可选的 work_id
+      mode: data.mode, 
+      duration: data.duration 
+    })
   }
 
   // 暂停计时
-  static async pauseTimer(sessionId: number): Promise<TimerSession> {
-    return tauriInvoke<TimerSession>('pause_timer', { sessionId })
+  static async pauseTimer(sessionId: number): Promise<boolean> {
+    return tauriInvoke<boolean>('pause_timer')
   }
 
   // 恢复计时
-  static async resumeTimer(sessionId: number): Promise<TimerSession> {
-    return tauriInvoke<TimerSession>('resume_timer', { sessionId })
+  static async resumeTimer(sessionId: number): Promise<boolean> {
+    return tauriInvoke<boolean>('resume_timer')
   }
 
   // 停止计时
-  static async stopTimer(sessionId: number): Promise<TimerSession> {
-    return tauriInvoke<TimerSession>('stop_timer', { sessionId })
+  static async stopTimer(sessionId: number): Promise<TimeRecord | null> {
+    return tauriInvoke<TimeRecord | null>('stop_timer')
   }
 
   // 获取计时器配置
@@ -106,12 +129,12 @@ export class TimerAPI {
 
   // 更新计时器配置
   static async updateTimerConfig(config: Partial<TimerConfig>): Promise<TimerConfig> {
-    return tauriInvoke<TimerConfig>('update_timer_config', { config })
+    return tauriInvoke<TimerConfig>('save_timer_config', config)
   }
 
   // 获取计时历史
   static async getTimerHistory(workId?: number): Promise<TimerSession[]> {
-    return tauriInvoke<TimerSession[]>('get_timer_history', { workId })
+    return tauriInvoke<TimerSession[]>('get_timer_sessions', { work_id: workId, limit: None })
   }
 }
 
@@ -232,6 +255,64 @@ export class SystemAPI {
   // 显示通知
   static async showNotification(title: string, body: string): Promise<void> {
     return tauriInvoke<void>('show_notification', { title, body })
+  }
+}
+
+// 窗口管理API
+export class WindowAPI {
+  // 显示主窗口
+  static async showMainWindow(): Promise<void> {
+    return tauriInvoke<void>('show_main_window')
+  }
+
+  // 隐藏主窗口
+  static async hideMainWindow(): Promise<void> {
+    return tauriInvoke<void>('hide_main_window')
+  }
+
+  // 切换悬浮窗
+  static async toggleFloatWindow(): Promise<void> {
+    return tauriInvoke<void>('toggle_float_window')
+  }
+
+  // 显示悬浮窗
+  static async showFloatWindow(): Promise<void> {
+    return tauriInvoke<void>('show_float_window')
+  }
+
+  // 隐藏悬浮窗
+  static async hideFloatWindow(): Promise<void> {
+    return tauriInvoke<void>('hide_float_window')
+  }
+
+  // 最小化主窗口
+  static async minimizeMainWindow(): Promise<void> {
+    return tauriInvoke<void>('minimize_main_window')
+  }
+
+  // 最大化主窗口
+  static async maximizeMainWindow(): Promise<void> {
+    return tauriInvoke<void>('maximize_main_window')
+  }
+
+  // 设置悬浮窗位置
+  static async setFloatWindowPosition(x: number, y: number): Promise<void> {
+    return tauriInvoke<void>('set_float_window_position', { x, y })
+  }
+
+  // 获取悬浮窗位置
+  static async getFloatWindowPosition(): Promise<{ x: number; y: number } | null> {
+    return tauriInvoke<{ x: number; y: number } | null>('get_float_window_position')
+  }
+
+  // 检查悬浮窗是否可见
+  static async isFloatWindowVisible(): Promise<boolean> {
+    return tauriInvoke<boolean>('is_float_window_visible')
+  }
+
+  // 检查主窗口是否可见
+  static async isMainWindowVisible(): Promise<boolean> {
+    return tauriInvoke<boolean>('is_main_window_visible')
   }
 }
 

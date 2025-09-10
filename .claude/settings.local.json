@@ -5,7 +5,14 @@
       "Bash(rm:*)",
       "Bash(pkill:*)",
       "Bash(npm run dev:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(npm run tauri:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run)",
+      "Bash(npx vite build:*)"
     ],
     "deny": [],
     "ask": []

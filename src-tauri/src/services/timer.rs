@@ -10,10 +10,12 @@ static CURRENT_SESSION: Lazy<Mutex<Option<TimerSession>>> = Lazy::new(|| Mutex::
 pub struct TimerService;
 
 impl TimerService {
-    pub fn start_timer(work_id: i64, mode: String, duration: i32) -> Result<TimerSession> {
+    pub fn start_timer(work_id: Option<i64>, mode: String, duration: i32) -> Result<TimerSession> {
+        let actual_work_id = work_id.unwrap_or(0); // 使用 0 表示未分类
+        
         let session = TimerSession {
             id: None,
-            work_id,
+            work_id: actual_work_id,
             mode,
             start_time: Utc::now(),
             is_active: true,
@@ -26,11 +28,11 @@ impl TimerService {
         // 记录到数据库
         let conn = get_connection()?;
         
-        // 首先创建 timer_sessions 表
+        // 首先创建 timer_sessions 表，允许 work_id 为 NULL
         conn.execute(
             "CREATE TABLE IF NOT EXISTS timer_sessions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                work_id INTEGER NOT NULL,
+                work_id INTEGER,
                 mode TEXT NOT NULL,
                 start_time DATETIME NOT NULL,
                 is_active BOOLEAN DEFAULT TRUE,

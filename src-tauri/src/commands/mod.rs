@@ -58,7 +58,7 @@ pub async fn unarchive_work(id: i64) -> Result<(), String> {
 
 // 计时器命令
 #[tauri::command]
-pub async fn start_timer(work_id: i64, mode: String, duration: i32) -> Result<TimerSession, String> {
+pub async fn start_timer(work_id: Option<i64>, mode: String, duration: i32) -> Result<TimerSession, String> {
     TimerService::start_timer(work_id, mode, duration)
         .map_err(|e| e.to_string())
 }

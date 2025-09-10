@@ -5,7 +5,6 @@ import { Dashboard } from '@/pages/Dashboard'
 import { Timer } from '@/pages/Timer'
 import { Analytics } from '@/pages/Analytics'
 import { Settings } from '@/pages/Settings'
-import { TestPage } from '@/pages/Test'
 
 export const router = createBrowserRouter([
   {

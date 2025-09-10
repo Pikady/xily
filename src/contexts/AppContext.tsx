@@ -15,7 +15,7 @@ type AppAction =
 const initialState: AppStateData = {
   theme: 'system',
   sidebar_open: true,
-  float_window_visible: false,
+  float_window_visible: true, // 默认显示悬浮窗
   float_window_position: { x: 100, y: 100 },
   active_modal: null,
   loading: false,
@@ -55,6 +55,35 @@ const AppContext = createContext<{
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
+
+  // 从localStorage恢复状态
+  useEffect(() => {
+    const savedFloatWindowVisible = localStorage.getItem('float-window-visible');
+    const savedFloatWindowPosition = localStorage.getItem('float-window-position');
+    
+    if (savedFloatWindowVisible !== null) {
+      dispatch({ type: 'TOGGLE_FLOAT_WINDOW' });
+    }
+    
+    if (savedFloatWindowPosition) {
+      try {
+        const position = JSON.parse(savedFloatWindowPosition);
+        dispatch({ type: 'SET_FLOAT_WINDOW_POSITION', payload: position });
+      } catch (error) {
+        console.error('Failed to parse saved position:', error);
+      }
+    }
+  }, []);
+
+  // 保存悬浮窗状态到localStorage
+  useEffect(() => {
+    localStorage.setItem('float-window-visible', state.float_window_visible.toString());
+  }, [state.float_window_visible]);
+
+  // 保存悬浮窗位置到localStorage
+  useEffect(() => {
+    localStorage.setItem('float-window-position', JSON.stringify(state.float_window_position));
+  }, [state.float_window_position]);
 
   // 监听在线状态
   useEffect(() => {
