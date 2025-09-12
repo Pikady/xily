@@ -53,7 +53,7 @@ export class WorksAPI {
       name: workData.name,
       description: workData.description,
       color: workData.color,
-      targetHours: workData.target_hours
+      target_hours: workData.target_hours
     })
   }
 

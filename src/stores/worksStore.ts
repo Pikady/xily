@@ -43,7 +43,13 @@ export const useWorksStore = create<WorksState>()(
           const newWork = await WorksAPI.createWork(workData)
           
           set((state) => {
-            state.works.push(newWork)
+            if (!state.works) {
+              state.works = []
+            }
+            // 确保newWork不是null再添加
+            if (newWork && newWork !== undefined) {
+              state.works.push(newWork)
+            }
             state.loading = false
           })
           
@@ -62,6 +68,9 @@ export const useWorksStore = create<WorksState>()(
           const updatedWork = await WorksAPI.updateWork(id.toString(), workData)
           
           set((state) => {
+            if (!state.works) {
+              state.works = []
+            }
             const workIndex = state.works.findIndex(w => w.id === id)
             if (workIndex !== -1) {
               state.works[workIndex] = updatedWork
@@ -87,6 +96,9 @@ export const useWorksStore = create<WorksState>()(
           await WorksAPI.deleteWork(id.toString())
           
           set((state) => {
+            if (!state.works) {
+              state.works = []
+            }
             state.works = state.works.filter(w => w.id !== id)
             if (state.currentWork?.id === id) {
               state.currentWork = null
@@ -109,6 +121,9 @@ export const useWorksStore = create<WorksState>()(
           await WorksAPI.archiveWork(id.toString())
           
           set((state) => {
+            if (!state.works) {
+              state.works = []
+            }
             const workIndex = state.works.findIndex(w => w.id === id)
             if (workIndex !== -1) {
               state.works[workIndex].is_archived = true
@@ -127,6 +142,9 @@ export const useWorksStore = create<WorksState>()(
           await WorksAPI.unarchiveWork(id.toString())
           
           set((state) => {
+            if (!state.works) {
+              state.works = []
+            }
             const workIndex = state.works.findIndex(w => w.id === id)
             if (workIndex !== -1) {
               state.works[workIndex].is_archived = false
@@ -151,7 +169,8 @@ export const useWorksStore = create<WorksState>()(
           const works = await WorksAPI.getAllWorks()
           
           set((state) => {
-            state.works = works
+            // 确保works是一个有效的数组，不包含null值
+            state.works = Array.isArray(works) ? works.filter(work => work !== null && work !== undefined) : []
             state.loading = false
           })
         } catch (error) {

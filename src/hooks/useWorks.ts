@@ -24,13 +24,13 @@ export const useWorks = () => {
   } = useWorksStore()
 
   // 兼容持久化/初始化阶段的空值
-  const worksList = Array.isArray(works) ? works : []
+  const worksList = Array.isArray(works) ? works.filter(work => work !== null && work !== undefined) : []
 
   // 获取活跃作品（未归档）
-  const activeWorks = worksList.filter(work => !work.is_archived)
+  const activeWorks = worksList.filter(work => work && !work.is_archived)
   
   // 获取已归档作品
-  const archivedWorks = worksList.filter(work => work.is_archived)
+  const archivedWorks = worksList.filter(work => work && work.is_archived)
 
   // 创建作品
   const createWork = useCallback(async (workData: CreateWorkParams) => {

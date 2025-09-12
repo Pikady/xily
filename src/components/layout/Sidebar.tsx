@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 const menuItems = [
-  { path: '/dashboard', label: '仪表板', icon: LayoutDashboard },
+  { path: '/', label: '仪表板', icon: LayoutDashboard },
   { path: '/works', label: '作品管理', icon: FolderOpen },
   { path: '/timer', label: '计时器', icon: Timer },
   { path: '/analytics', label: '数据分析', icon: BarChart3 },
