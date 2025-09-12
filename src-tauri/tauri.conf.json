@@ -15,11 +15,28 @@
       {
         "title": "xily",
         "width": 800,
-        "height": 600
+        "height": 600,
+        "label": "main"
+      },
+      {
+        "title": "悬浮窗",
+        "width": 200,
+        "height": 200,
+        "label": "float",
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "transparent": true,
+        "resizable": false
       }
     ],
     "security": {
       "csp": null
+    },
+    "trayIcon": {
+      "iconPath": "icons/tray-icon.png",
+      "iconAsTemplate": true
     }
   },
   "bundle": {

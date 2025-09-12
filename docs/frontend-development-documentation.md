@@ -114,14 +114,784 @@ export interface AppState {
 
 ## 3. 核心功能模块
 
-### 3.1 潮汐节律系统
+### 3.1 系统托盘和右键菜单系统
 
-#### 3.1.1 模式设计
+系统托盘和右键菜单是汐律应用的核心系统集成功能，提供后台运行时的应用控制能力。
+
+#### 3.1.1 系统托盘管理模块
+
+##### 托盘状态管理
+```typescript
+// stores/trayStore.ts
+import { create } from 'zustand';
+import { devtools, persist } from 'zustand/middleware';
+
+interface TrayState {
+  isVisible: boolean;
+  tooltip: string;
+  icon: string;
+  menuItems: TrayMenuItem[];
+  timerStatus: 'running' | 'paused' | 'stopped';
+  windowState: {
+    mainVisible: boolean;
+    floatVisible: boolean;
+  };
+  notifications: TrayNotification[];
+  
+  // Actions
+  setVisibility: (visible: boolean) => void;
+  setTooltip: (tooltip: string) => void;
+  setIcon: (icon: string) => void;
+  updateMenuItems: (items: TrayMenuItem[]) => void;
+  setTimerStatus: (status: 'running' | 'paused' | 'stopped') => void;
+  updateWindowState: (state: Partial<TrayState['windowState']>) => void;
+  addNotification: (notification: TrayNotification) => void;
+  clearNotifications: () => void;
+}
+
+interface TrayMenuItem {
+  id: string;
+  text: string;
+  enabled: boolean;
+  checked?: boolean;
+  separator?: boolean;
+  icon?: string;
+  action?: () => void;
+}
+
+interface TrayNotification {
+  id: string;
+  title: string;
+  body: string;
+  icon?: string;
+  timestamp: Date;
+  duration?: number;
+}
+
+export const useTrayStore = create<TrayState>()(
+  devtools(
+    persist(
+      (set, get) => ({
+        isVisible: false,
+        tooltip: '汐律 - 智能时间管理工具',
+        icon: 'default',
+        menuItems: [],
+        timerStatus: 'stopped',
+        windowState: {
+          mainVisible: true,
+          floatVisible: false,
+        },
+        notifications: [],
+
+        setVisibility: (visible) => set({ isVisible: visible }),
+        setTooltip: (tooltip) => set({ tooltip }),
+        setIcon: (icon) => set({ icon }),
+        updateMenuItems: (menuItems) => set({ menuItems }),
+        setTimerStatus: (timerStatus) => set({ timerStatus }),
+        updateWindowState: (windowState) => 
+          set((state) => ({ 
+            windowState: { ...state.windowState, ...windowState } 
+          })),
+        addNotification: (notification) => 
+          set((state) => ({ 
+            notifications: [...state.notifications, notification] 
+          })),
+        clearNotifications: () => set({ notifications: [] }),
+      }),
+      {
+        name: 'tray-storage',
+        partialize: (state) => ({ 
+          isVisible: state.isVisible,
+          icon: state.icon,
+          tooltip: state.tooltip,
+        }),
+      }
+    )
+  )
+);
+```
+
+##### 托盘服务类
+```typescript
+// services/trayService.ts
+import { invoke } from '@tauri-apps/api/tauri';
+import { useTrayStore } from '@/stores/trayStore';
+
+export class TrayService {
+  private static instance: TrayService;
+
+  static getInstance(): TrayService {
+    if (!TrayService.instance) {
+      TrayService.instance = new TrayService();
+    }
+    return TrayService.instance;
+  }
+
+  // 初始化系统托盘
+  async init(): Promise<void> {
+    try {
+      await invoke('show_tray');
+      await this.updateTooltip();
+      await this.setupDefaultMenu();
+      await this.setupEventListeners();
+    } catch (error) {
+      console.error('初始化系统托盘失败:', error);
+    }
+  }
+
+  // 更新托盘提示文本
+  async updateTooltip(): Promise<void> {
+    const { tooltip, timerStatus } = useTrayStore.getState();
+    const statusText = timerStatus === 'running' ? '运行中' : 
+                       timerStatus === 'paused' ? '已暂停' : '已停止';
+    const fullTooltip = `${tooltip} - ${statusText}`;
+    
+    try {
+      await invoke('set_tray_tooltip', { tooltip: fullTooltip });
+    } catch (error) {
+      console.error('更新托盘提示失败:', error);
+    }
+  }
+
+  // 设置默认菜单
+  async setupDefaultMenu(): Promise<void> {
+    const menuItems: TrayMenuItem[] = [
+      { id: 'show', text: '显示主窗口', enabled: true },
+      { id: 'hide', text: '隐藏主窗口', enabled: true },
+      { id: 'separator', text: '-', enabled: true },
+      { id: 'float', text: '显示悬浮窗', enabled: true },
+      { id: 'separator', text: '-', enabled: true },
+      { id: 'quit', text: '退出应用', enabled: true },
+    ];
+
+    try {
+      await invoke('set_tray_context_menu', { items: menuItems });
+      useTrayStore.getState().updateMenuItems(menuItems);
+    } catch (error) {
+      console.error('设置托盘菜单失败:', error);
+    }
+  }
+
+  // 设置事件监听器
+  private setupEventListeners(): void {
+    // 监听计时器状态变化
+    useTrayStore.subscribe(
+      (state) => state.timerStatus,
+      (timerStatus) => {
+        this.updateTooltip();
+        this.updateMenuForTimerStatus(timerStatus);
+      }
+    );
+
+    // 监听窗口状态变化
+    useTrayStore.subscribe(
+      (state) => state.windowState,
+      (windowState) => {
+        this.updateMenuForWindowState(windowState);
+      }
+    );
+  }
+
+  // 根据计时器状态更新菜单
+  private async updateMenuForTimerStatus(status: string): Promise<void> {
+    const menuItems = useTrayStore.getState().menuItems.map(item => {
+      if (item.id === 'timer') {
+        return {
+          ...item,
+          text: status === 'running' ? '暂停计时' : '开始计时',
+          enabled: true,
+        };
+      }
+      return item;
+    });
+
+    try {
+      await invoke('update_tray_menu', { items: menuItems });
+    } catch (error) {
+      console.error('更新托盘菜单失败:', error);
+    }
+  }
+
+  // 根据窗口状态更新菜单
+  private async updateMenuForWindowState(windowState: TrayState['windowState']): Promise<void> {
+    const menuItems = useTrayStore.getState().menuItems.map(item => {
+      if (item.id === 'show') {
+        return { ...item, enabled: !windowState.mainVisible };
+      }
+      if (item.id === 'hide') {
+        return { ...item, enabled: windowState.mainVisible };
+      }
+      if (item.id === 'float') {
+        return { 
+          ...item, 
+          text: windowState.floatVisible ? '隐藏悬浮窗' : '显示悬浮窗',
+          enabled: true,
+        };
+      }
+      return item;
+    });
+
+    try {
+      await invoke('update_tray_menu', { items: menuItems });
+    } catch (error) {
+      console.error('更新托盘菜单失败:', error);
+    }
+  }
+
+  // 显示托盘通知
+  async showNotification(
+    title: string, 
+    body: string, 
+    icon: 'info' | 'success' | 'warning' | 'error' = 'info'
+  ): Promise<void> {
+    try {
+      await invoke('show_tray_notification', {
+        title,
+        body,
+        icon,
+        duration: 5000,
+      });
+
+      // 添加到通知历史
+      const notification: TrayNotification = {
+        id: Date.now().toString(),
+        title,
+        body,
+        icon,
+        timestamp: new Date(),
+        duration: 5000,
+      };
+
+      useTrayStore.getState().addNotification(notification);
+    } catch (error) {
+      console.error('显示托盘通知失败:', error);
+    }
+  }
+
+  // 处理托盘菜单点击事件
+  async handleMenuClick(menuId: string): Promise<void> {
+    switch (menuId) {
+      case 'show':
+        await this.showMainWindow();
+        break;
+      case 'hide':
+        await this.hideMainWindow();
+        break;
+      case 'float':
+        await this.toggleFloatWindow();
+        break;
+      case 'quit':
+        await this.quitApp();
+        break;
+      case 'timer':
+        await this.toggleTimer();
+        break;
+      default:
+        console.warn('未知的托盘菜单项:', menuId);
+    }
+  }
+
+  // 显示主窗口
+  private async showMainWindow(): Promise<void> {
+    try {
+      await invoke('show_main_window');
+      useTrayStore.getState().updateWindowState({ mainVisible: true });
+    } catch (error) {
+      console.error('显示主窗口失败:', error);
+    }
+  }
+
+  // 隐藏主窗口
+  private async hideMainWindow(): Promise<void> {
+    try {
+      await invoke('hide_main_window');
+      useTrayStore.getState().updateWindowState({ mainVisible: false });
+    } catch (error) {
+      console.error('隐藏主窗口失败:', error);
+    }
+  }
+
+  // 切换悬浮窗
+  private async toggleFloatWindow(): Promise<void> {
+    try {
+      await invoke('toggle_float_window');
+      const currentState = useTrayStore.getState().windowState;
+      useTrayStore.getState().updateWindowState({ 
+        floatVisible: !currentState.floatVisible 
+      });
+    } catch (error) {
+      console.error('切换悬浮窗失败:', error);
+    }
+  }
+
+  // 退出应用
+  private async quitApp(): Promise<void> {
+    try {
+      await invoke('quit_app');
+    } catch (error) {
+      console.error('退出应用失败:', error);
+    }
+  }
+
+  // 切换计时器
+  private async toggleTimer(): Promise<void> {
+    // 这里需要与计时器store集成
+    const timerStatus = useTrayStore.getState().timerStatus;
+    // 实现计时器切换逻辑
+  }
+}
+```
+
+#### 3.1.2 右键菜单组件
+
+##### 右键菜单组件实现
+```typescript
+// components/features/tray/ContextMenu.tsx
+import React, { useState, useEffect, useRef } from 'react';
+import { Menu, MenuItem, MenuSeparator } from '@/components/ui/menu';
+import { useTrayStore } from '@/stores/trayStore';
+import { TrayService } from '@/services/trayService';
+import { cn } from '@/lib/utils';
+
+interface ContextMenuProps {
+  visible: boolean;
+  x: number;
+  y: number;
+  onClose: () => void;
+}
+
+export function ContextMenu({ visible, x, y, onClose }: ContextMenuProps) {
+  const { menuItems, timerStatus, windowState } = useTrayStore();
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ x, y });
+
+  // 处理菜单项点击
+  const handleItemClick = async (itemId: string) => {
+    try {
+      await TrayService.getInstance().handleMenuClick(itemId);
+      onClose();
+    } catch (error) {
+      console.error('处理菜单点击失败:', error);
+    }
+  };
+
+  // 获取菜单项文本
+  const getMenuItemText = (item: TrayMenuItem): string => {
+    switch (item.id) {
+      case 'show':
+        return windowState.mainVisible ? '主窗口已显示' : '显示主窗口';
+      case 'hide':
+        return windowState.mainVisible ? '隐藏主窗口' : '主窗口已隐藏';
+      case 'float':
+        return windowState.floatVisible ? '隐藏悬浮窗' : '显示悬浮窗';
+      case 'timer':
+        return timerStatus === 'running' ? '暂停计时' : '开始计时';
+      default:
+        return item.text;
+    }
+  };
+
+  // 获取菜单项启用状态
+  const getMenuItemEnabled = (item: TrayMenuItem): boolean => {
+    switch (item.id) {
+      case 'show':
+        return !windowState.mainVisible;
+      case 'hide':
+        return windowState.mainVisible;
+      default:
+        return item.enabled;
+    }
+  };
+
+  // 渲染菜单项
+  const renderMenuItem = (item: TrayMenuItem) => {
+    if (item.separator) {
+      return <MenuSeparator key="separator" />;
+    }
+
+    return (
+      <MenuItem
+        key={item.id}
+        onClick={() => handleItemClick(item.id)}
+        disabled={!getMenuItemEnabled(item)}
+        className={cn(
+          'flex items-center gap-2',
+          !getMenuItemEnabled(item) && 'opacity-50 cursor-not-allowed'
+        )}
+      >
+        {item.icon && (
+          <span className="w-4 h-4">{item.icon}</span>
+        )}
+        <span>{getMenuItemText(item)}</span>
+        {item.checked && (
+          <span className="ml-auto">✓</span>
+        )}
+      </MenuItem>
+    );
+  };
+
+  // 点击外部关闭菜单
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+
+    if (visible) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [visible, onClose]);
+
+  // 调整菜单位置以确保在屏幕内
+  useEffect(() => {
+    if (visible && menuRef.current) {
+      const menuRect = menuRef.current.getBoundingClientRect();
+      const screenWidth = window.innerWidth;
+      const screenHeight = window.innerHeight;
+
+      let adjustedX = x;
+      let adjustedY = y;
+
+      // 确保菜单不超出屏幕右边界
+      if (x + menuRect.width > screenWidth) {
+        adjustedX = screenWidth - menuRect.width - 10;
+      }
+
+      // 确保菜单不超出屏幕底部
+      if (y + menuRect.height > screenHeight) {
+        adjustedY = screenHeight - menuRect.height - 10;
+      }
+
+      setPosition({ x: adjustedX, y: adjustedY });
+    }
+  }, [visible, x, y]);
+
+  if (!visible) return null;
+
+  return (
+    <div
+      ref={menuRef}
+      className="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg min-w-[200px]"
+      style={{
+        left: `${position.x}px`,
+        top: `${position.y}px`,
+      }}
+    >
+      <Menu>
+        {menuItems.map(renderMenuItem)}
+      </Menu>
+    </div>
+  );
+}
+```
+
+##### 菜单组件样式
+```typescript
+// components/ui/menu.tsx
+import React from 'react';
+import { cn } from '@/lib/utils';
+
+interface MenuProps {
+  children: React.ReactNode;
+  className?: string;
+}
+
+export function Menu({ children, className }: MenuProps) {
+  return (
+    <div className={cn('py-1', className)}>
+      {children}
+    </div>
+  );
+}
+
+interface MenuItemProps {
+  children: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  className?: string;
+}
+
+export function MenuItem({ children, onClick, disabled, className }: MenuItemProps) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'w-full px-4 py-2 text-left text-sm hover:bg-gray-100 disabled:hover:bg-transparent disabled:text-gray-400',
+        className
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+export function MenuSeparator() {
+  return <div className="my-1 border-t border-gray-200" />;
+}
+```
+
+#### 3.1.3 托盘通知组件
+
+##### 通知组件实现
+```typescript
+// components/features/tray/TrayNotification.tsx
+import React, { useEffect, useState } from 'react';
+import { useTrayStore } from '@/stores/trayStore';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { X, Info, CheckCircle, AlertTriangle, XCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+interface TrayNotificationComponentProps {
+  notification: TrayNotification;
+  onClose: (id: string) => void;
+}
+
+export function TrayNotificationComponent({ 
+  notification, 
+  onClose 
+}: TrayNotificationComponentProps) {
+  const [isVisible, setIsVisible] = useState(true);
+  const [isClosing, setIsClosing] = useState(false);
+
+  // 获取图标组件
+  const getIconComponent = () => {
+    switch (notification.icon) {
+      case 'success':
+        return <CheckCircle className="w-5 h-5 text-green-500" />;
+      case 'warning':
+        return <AlertTriangle className="w-5 h-5 text-yellow-500" />;
+      case 'error':
+        return <XCircle className="w-5 h-5 text-red-500" />;
+      default:
+        return <Info className="w-5 h-5 text-blue-500" />;
+    }
+  };
+
+  // 自动关闭通知
+  useEffect(() => {
+    if (notification.duration) {
+      const timer = setTimeout(() => {
+        handleClose();
+      }, notification.duration);
+
+      return () => clearTimeout(timer);
+    }
+  }, [notification.duration]);
+
+  const handleClose = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      setIsVisible(false);
+      onClose(notification.id);
+    }, 300);
+  };
+
+  if (!isVisible) return null;
+
+  return (
+    <Card
+      className={cn(
+        'fixed top-4 right-4 z-50 w-80 shadow-lg border-l-4 transition-all duration-300',
+        isClosing ? 'opacity-0 transform translate-x-full' : 'opacity-100',
+        notification.icon === 'success' && 'border-l-green-500',
+        notification.icon === 'warning' && 'border-l-yellow-500',
+        notification.icon === 'error' && 'border-l-red-500',
+        !notification.icon || notification.icon === 'info' && 'border-l-blue-500'
+      )}
+    >
+      <CardContent className="p-4">
+        <div className="flex items-start gap-3">
+          <div className="flex-shrink-0 mt-0.5">
+            {getIconComponent()}
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className="text-sm font-medium text-gray-900 mb-1">
+              {notification.title}
+            </h4>
+            <p className="text-sm text-gray-600">
+              {notification.body}
+            </p>
+            <p className="text-xs text-gray-400 mt-2">
+              {notification.timestamp.toLocaleTimeString()}
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleClose}
+            className="flex-shrink-0 p-1 h-auto hover:bg-gray-100"
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// 通知容器组件
+export function TrayNotificationContainer() {
+  const { notifications, clearNotifications } = useTrayStore();
+
+  const handleClose = (id: string) => {
+    // 从store中移除通知
+    const updatedNotifications = notifications.filter(n => n.id !== id);
+    useTrayStore.getState().clearNotifications();
+    updatedNotifications.forEach(n => 
+      useTrayStore.getState().addNotification(n)
+    );
+  };
+
+  return (
+    <div className="fixed top-4 right-4 z-50 space-y-2">
+      {notifications.map((notification) => (
+        <TrayNotificationComponent
+          key={notification.id}
+          notification={notification}
+          onClose={handleClose}
+        />
+      ))}
+    </div>
+  );
+}
+```
+
+#### 3.1.4 托盘管理主组件
+
+##### 托盘管理组件
+```typescript
+// components/features/tray/TrayManager.tsx
+import React, { useEffect } from 'react';
+import { useTrayStore } from '@/stores/trayStore';
+import { useTimerStore } from '@/stores/timerStore';
+import { TrayService } from '@/services/trayService';
+import { ContextMenu } from './ContextMenu';
+import { TrayNotificationContainer } from './TrayNotification';
+
+export function TrayManager() {
+  const { 
+    isVisible, 
+    timerStatus, 
+    windowState, 
+    setTimerStatus,
+    updateWindowState 
+  } = useTrayStore();
+  
+  const { currentSession, isRunning } = useTimerStore();
+  const [contextMenu, setContextMenu] = useState({
+    visible: false,
+    x: 0,
+    y: 0,
+  });
+
+  // 初始化系统托盘
+  useEffect(() => {
+    const trayService = TrayService.getInstance();
+    trayService.init();
+
+    return () => {
+      // 清理资源
+    };
+  }, []);
+
+  // 同步计时器状态
+  useEffect(() => {
+    if (isRunning && currentSession) {
+      setTimerStatus('running');
+    } else if (currentSession && !currentSession.is_active) {
+      setTimerStatus('paused');
+    } else {
+      setTimerStatus('stopped');
+    }
+  }, [isRunning, currentSession, setTimerStatus]);
+
+  // 监听窗口状态变化
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      updateWindowState({
+        mainVisible: !document.hidden,
+      });
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [updateWindowState]);
+
+  // 处理右键菜单事件
+  const handleContextMenu = (event: React.MouseEvent) => {
+    event.preventDefault();
+    setContextMenu({
+      visible: true,
+      x: event.clientX,
+      y: event.clientY,
+    });
+  };
+
+  // 处理托盘图标点击事件
+  const handleTrayClick = () => {
+    // 左键点击切换主窗口
+    const currentState = useTrayStore.getState().windowState;
+    if (currentState.mainVisible) {
+      TrayService.getInstance().hideMainWindow();
+    } else {
+      TrayService.getInstance().showMainWindow();
+    }
+  };
+
+  // 处理托盘图标双击事件
+  const handleTrayDoubleClick = () => {
+    // 双击切换悬浮窗
+    TrayService.getInstance().toggleFloatWindow();
+  };
+
+  return (
+    <div 
+      className="tray-manager"
+      onContextMenu={handleContextMenu}
+    >
+      {/* 右键菜单 */}
+      <ContextMenu
+        visible={contextMenu.visible}
+        x={contextMenu.x}
+        y={contextMenu.y}
+        onClose={() => setContextMenu({ visible: false, x: 0, y: 0 })}
+      />
+
+      {/* 通知容器 */}
+      <TrayNotificationContainer />
+
+      {/* 托盘状态指示器（开发模式下显示） */}
+      {import.meta.env.DEV && (
+        <div className="fixed bottom-4 left-4 bg-gray-800 text-white p-2 rounded text-xs">
+          <div>托盘状态: {isVisible ? '可见' : '隐藏'}</div>
+          <div>计时器: {timerStatus}</div>
+          <div>主窗口: {windowState.mainVisible ? '可见' : '隐藏'}</div>
+          <div>悬浮窗: {windowState.floatVisible ? '可见' : '隐藏'}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+### 3.2 潮汐节律系统
+
+#### 3.2.1 模式设计
 - **探索模式** (蓝色系): hsl(210, 40%, 50%)
 - **利用模式** (橙色系): hsl(24, 100%, 50%)
 - **中性模式** (灰色系): hsl(210, 40%, 96%)
 
-#### 3.1.2 模式切换组件
+#### 3.2.2 模式切换组件
 ```typescript
 // components/features/tide/TideModeSwitch.tsx
 import { Button } from "@/components/ui/button"
@@ -171,9 +941,9 @@ export function TideModeSwitch({
 }
 ```
 
-### 3.2 智能计时系统
+### 3.3 智能计时系统
 
-#### 3.2.1 计时器组件
+#### 3.3.1 计时器组件
 ```typescript
 // components/features/timer/TimerDisplay.tsx
 import { Card, CardContent } from "@/components/ui/card"
@@ -314,7 +1084,7 @@ export function TimerDisplay({
 }
 ```
 
-#### 3.2.2 悬浮窗组件
+#### 3.3.2 悬浮窗组件
 ```typescript
 interface FloatWindowProps {
   isVisible: boolean;
@@ -324,9 +1094,9 @@ interface FloatWindowProps {
 }
 ```
 
-### 3.3 作品管理系统
+### 3.4 作品管理系统
 
-#### 3.3.1 作品卡片组件
+#### 3.4.1 作品卡片组件
 ```typescript
 // components/features/works/WorkCard.tsx
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -451,7 +1221,7 @@ export function WorkCard({
 }
 ```
 
-#### 3.3.2 作品表单组件
+#### 3.4.2 作品表单组件
 ```typescript
 interface WorkFormProps {
   work?: Work;
@@ -460,15 +1230,15 @@ interface WorkFormProps {
 }
 ```
 
-### 3.4 数据分析系统
+### 3.5 数据分析系统
 
-#### 3.4.1 图表组件
+#### 3.5.1 图表组件
 - **时间分布图**: 饼图/柱状图
 - **趋势分析图**: 折线图
 - **模式分布图**: 环形图
 - **进度条图**: 水平进度条
 
-#### 3.4.2 数据卡片组件
+#### 3.5.2 数据卡片组件
 ```typescript
 interface StatsCardProps {
   title: string;
@@ -480,9 +1250,524 @@ interface StatsCardProps {
 }
 ```
 
-## 4. API服务层
+## 4. 系统托盘集成和配置
 
-### 4.1 API服务架构
+### 4.1 系统托盘初始化和配置
+
+#### 4.1.1 应用入口集成
+```typescript
+// src/App.tsx
+import React, { useEffect } from 'react';
+import { TrayManager } from '@/components/features/tray/TrayManager';
+import { TrayService } from '@/services/trayService';
+
+function App() {
+  useEffect(() => {
+    // 应用启动时初始化系统托盘
+    const initializeTray = async () => {
+      try {
+        await TrayService.getInstance().init();
+        console.log('系统托盘初始化成功');
+      } catch (error) {
+        console.error('系统托盘初始化失败:', error);
+      }
+    };
+
+    initializeTray();
+  }, []);
+
+  return (
+    <div className="app">
+      {/* 应用主要内容 */}
+      <div className="main-content">
+        {/* 其他组件 */}
+      </div>
+      
+      {/* 系统托盘管理器 */}
+      <TrayManager />
+    </div>
+  );
+}
+
+export default App;
+```
+
+#### 4.1.2 Tauri 配置
+```rust
+// src-tauri/src/main.rs
+use tauri::{Manager, SystemTray, SystemTrayMenu, CustomMenuItem};
+
+// 系统托盘菜单项
+const SHOW_ITEM: &str = "show";
+const HIDE_ITEM: &str = "hide";
+const FLOAT_ITEM: &str = "float";
+const QUIT_ITEM: &str = "quit";
+
+fn main() {
+    tauri::Builder::default()
+        .setup(|app| {
+            // 创建系统托盘
+            let show_item = CustomMenuItem::new(SHOW_ITEM.to_string(), "显示主窗口");
+            let hide_item = CustomMenuItem::new(HIDE_ITEM.to_string(), "隐藏主窗口");
+            let float_item = CustomMenuItem::new(FLOAT_ITEM.to_string(), "显示悬浮窗");
+            let quit_item = CustomMenuItem::new(QUIT_ITEM.to_string(), "退出应用");
+            
+            let tray_menu = SystemTrayMenu::new()
+                .add_item(show_item)
+                .add_item(hide_item)
+                .add_native_item(SystemTrayMenuItem::Separator)
+                .add_item(float_item)
+                .add_native_item(SystemTrayMenuItem::Separator)
+                .add_item(quit_item);
+
+            let tray = SystemTray::new().with_menu(tray_menu);
+            
+            Ok(())
+        })
+        .system_tray(tray)
+        .on_system_tray_event(|app, event| {
+            match event {
+                SystemTrayEvent::LeftClick => {
+                    // 左键点击切换主窗口
+                    if let Some(window) = app.get_window("main") {
+                        if window.is_visible().unwrap_or(false) {
+                            window.hide().unwrap();
+                        } else {
+                            window.show().unwrap();
+                        }
+                    }
+                }
+                SystemTrayEvent::RightClick => {
+                    // 右键点击显示菜单（自动处理）
+                }
+                SystemTrayEvent::DoubleClick => {
+                    // 双击切换悬浮窗
+                    if let Some(window) = app.get_window("float") {
+                        if window.is_visible().unwrap_or(false) {
+                            window.hide().unwrap();
+                        } else {
+                            window.show().unwrap();
+                        }
+                    }
+                }
+                SystemTrayEvent::MenuItemClick { id, .. } => {
+                    match id.as_str() {
+                        SHOW_ITEM => {
+                            if let Some(window) = app.get_window("main") {
+                                window.show().unwrap();
+                            }
+                        }
+                        HIDE_ITEM => {
+                            if let Some(window) = app.get_window("main") {
+                                window.hide().unwrap();
+                            }
+                        }
+                        FLOAT_ITEM => {
+                            if let Some(window) = app.get_window("float") {
+                                if window.is_visible().unwrap_or(false) {
+                                    window.hide().unwrap();
+                                } else {
+                                    window.show().unwrap();
+                                }
+                            }
+                        }
+                        QUIT_ITEM => {
+                            app.exit(0);
+                        }
+                        _ => {}
+                    }
+                }
+                _ => {}
+            }
+        })
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}
+```
+
+#### 4.1.3 托盘图标资源
+```json
+// src-tauri/tauri.conf.json
+{
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devPath": "http://localhost:1420",
+    "distDir": "../dist",
+    "withGlobalTauri": false
+  },
+  "package": {
+    "productName": "汐律",
+    "version": "1.0.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": true,
+      "shell": {
+        "all": true,
+        "open": true
+      },
+      "window": {
+        "all": true
+      },
+      "notification": {
+        "all": true
+      },
+      "systemTray": {
+        "all": true
+      },
+      "globalShortcut": {
+        "all": true
+      }
+    },
+    "bundle": {
+      "active": true,
+      "targets": "all",
+      "identifier": "com.xily.app",
+      "icon": [
+        "icons/32x32.png",
+        "icons/128x128.png",
+        "icons/128x128@2x.png",
+        "icons/icon.icns",
+        "icons/icon.ico"
+      ],
+      "resources": ["icons/*"],
+      "category": "Productivity"
+    },
+    "security": {
+      "csp": null
+    },
+    "windows": [
+      {
+        "fullscreen": false,
+        "resizable": true,
+        "title": "汐律 - 智能时间管理工具",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 600,
+        "decorations": true,
+        "transparent": false,
+        "center": true,
+        "label": "main"
+      },
+      {
+        "label": "float",
+        "width": 200,
+        "height": 200,
+        "resizable": false,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "transparent": true,
+        "center": true
+      }
+    ],
+    "systemTray": {
+      "iconPath": "icons/tray-icon.png",
+      "iconAsTemplate": true,
+      "menuOnLeftClick": false,
+      "tooltip": "汐律 - 智能时间管理工具"
+    }
+  }
+}
+```
+
+### 4.2 托盘事件处理和状态同步
+
+#### 4.2.1 事件监听器设置
+```typescript
+// services/trayEventListeners.ts
+import { listen } from '@tauri-apps/api/event';
+import { useTrayStore } from '@/stores/trayStore';
+import { useTimerStore } from '@/stores/timerStore';
+
+export class TrayEventListeners {
+  static setup(): void {
+    this.setupWindowListeners();
+    this.setupTimerListeners();
+    this.setupTrayListeners();
+  }
+
+  private static setupWindowListeners(): void {
+    // 监听窗口显示/隐藏事件
+    listen('window-shown', () => {
+      useTrayStore.getState().updateWindowState({ mainVisible: true });
+    });
+
+    listen('window-hidden', () => {
+      useTrayStore.getState().updateWindowState({ mainVisible: false });
+    });
+
+    listen('float-window-shown', () => {
+      useTrayStore.getState().updateWindowState({ floatVisible: true });
+    });
+
+    listen('float-window-hidden', () => {
+      useTrayStore.getState().updateWindowState({ floatVisible: false });
+    });
+  }
+
+  private static setupTimerListeners(): void {
+    // 监听计时器状态变化
+    listen('timer-started', () => {
+      useTrayStore.getState().setTimerStatus('running');
+    });
+
+    listen('timer-paused', () => {
+      useTrayStore.getState().setTimerStatus('paused');
+    });
+
+    listen('timer-stopped', () => {
+      useTrayStore.getState().setTimerStatus('stopped');
+    });
+
+    listen('timer-completed', (event) => {
+      const { duration, mode } = event.payload as any;
+      TrayService.getInstance().showNotification(
+        '计时完成',
+        `您的一个${mode === 'explore' ? '探索' : '利用'}时段已完成！`,
+        'success'
+      );
+    });
+  }
+
+  private static setupTrayListeners(): void {
+    // 监听托盘菜单点击事件
+    listen('tray-menu-click', (event) => {
+      const { menuItemId } = event.payload as any;
+      TrayService.getInstance().handleMenuClick(menuItemId);
+    });
+
+    // 监听托盘图标点击事件
+    listen('tray-icon-click', (event) => {
+      const { clickType } = event.payload as any;
+      
+      switch (clickType) {
+        case 'single':
+          // 切换主窗口
+          const currentState = useTrayStore.getState().windowState;
+          if (currentState.mainVisible) {
+            TrayService.getInstance().hideMainWindow();
+          } else {
+            TrayService.getInstance().showMainWindow();
+          }
+          break;
+        case 'double':
+          // 切换悬浮窗
+          TrayService.getInstance().toggleFloatWindow();
+          break;
+      }
+    });
+  }
+}
+```
+
+#### 4.2.2 状态同步服务
+```typescript
+// services/stateSyncService.ts
+import { useTrayStore } from '@/stores/trayStore';
+import { useTimerStore } from '@/stores/timerStore';
+import { useWorksStore } from '@/stores/worksStore';
+
+export class StateSyncService {
+  private static instance: StateSyncService;
+
+  static getInstance(): StateSyncService {
+    if (!StateSyncService.instance) {
+      StateSyncService.instance = new StateSyncService();
+    }
+    return StateSyncService.instance;
+  }
+
+  // 同步所有状态到托盘
+  async syncAllStates(): Promise<void> {
+    await this.syncTimerState();
+    await this.syncWindowState();
+    await this.syncTrayMenu();
+  }
+
+  // 同步计时器状态
+  private async syncTimerState(): Promise<void> {
+    const { currentSession, isRunning } = useTimerStore.getState();
+    const { setTimerStatus } = useTrayStore.getState();
+
+    let status: 'running' | 'paused' | 'stopped' = 'stopped';
+    
+    if (currentSession) {
+      status = currentSession.is_active ? 'running' : 'paused';
+    }
+
+    setTimerStatus(status);
+  }
+
+  // 同步窗口状态
+  private async syncWindowState(): Promise<void> {
+    // 获取实际窗口状态并同步到store
+    const mainVisible = await this.getMainWindowVisibility();
+    const floatVisible = await this.getFloatWindowVisibility();
+
+    useTrayStore.getState().updateWindowState({
+      mainVisible,
+      floatVisible,
+    });
+  }
+
+  // 同步托盘菜单
+  private async syncTrayMenu(): Promise<void> {
+    const { windowState, timerStatus } = useTrayStore.getState();
+    
+    // 根据当前状态更新菜单项
+    const menuItems = [
+      { id: 'show', text: '显示主窗口', enabled: !windowState.mainVisible },
+      { id: 'hide', text: '隐藏主窗口', enabled: windowState.mainVisible },
+      { id: 'separator', text: '-', enabled: true },
+      { 
+        id: 'float', 
+        text: windowState.floatVisible ? '隐藏悬浮窗' : '显示悬浮窗', 
+        enabled: true 
+      },
+      { id: 'separator', text: '-', enabled: true },
+      { 
+        id: 'timer', 
+        text: timerStatus === 'running' ? '暂停计时' : '开始计时', 
+        enabled: true 
+      },
+      { id: 'separator', text: '-', enabled: true },
+      { id: 'quit', text: '退出应用', enabled: true },
+    ];
+
+    useTrayStore.getState().updateMenuItems(menuItems);
+  }
+
+  // 获取主窗口可见性
+  private async getMainWindowVisibility(): Promise<boolean> {
+    try {
+      // 调用Tauri API获取窗口状态
+      return await invoke<boolean>('is_main_window_visible');
+    } catch {
+      return true; // 默认返回可见
+    }
+  }
+
+  // 获取悬浮窗可见性
+  private async getFloatWindowVisibility(): Promise<boolean> {
+    try {
+      return await invoke<boolean>('is_float_window_visible');
+    } catch {
+      return false; // 默认返回不可见
+    }
+  }
+}
+```
+
+### 4.3 托盘配置和自定义
+
+#### 4.3.1 托盘设置界面
+```typescript
+// components/features/settings/TraySettings.tsx
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useTrayStore } from '@/stores/trayStore';
+import { TrayService } from '@/services/trayService';
+
+export function TraySettings() {
+  const { isVisible, tooltip, setVisibility, setTooltip } = useTrayStore();
+
+  const handleToggleTray = async (enabled: boolean) => {
+    try {
+      if (enabled) {
+        await TrayService.getInstance().init();
+      } else {
+        await invoke('hide_tray');
+      }
+      setVisibility(enabled);
+    } catch (error) {
+      console.error('切换托盘状态失败:', error);
+    }
+  };
+
+  const handleTooltipChange = async (value: string) => {
+    try {
+      await invoke('set_tray_tooltip', { tooltip: value });
+      setTooltip(value);
+    } catch (error) {
+      console.error('更新托盘提示失败:', error);
+    }
+  };
+
+  const handleTestNotification = async () => {
+    await TrayService.getInstance().showNotification(
+      '测试通知',
+      '这是一个测试通知消息',
+      'info'
+    );
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>系统托盘设置</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* 托盘开关 */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h4 className="font-medium">启用系统托盘</h4>
+            <p className="text-sm text-muted-foreground">
+              在系统托盘中显示应用图标
+            </p>
+          </div>
+          <Switch
+            checked={isVisible}
+            onCheckedChange={handleToggleTray}
+          />
+        </div>
+
+        {/* 托盘提示文本 */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium">托盘提示文本</label>
+          <Input
+            value={tooltip}
+            onChange={(e) => handleTooltipChange(e.target.value)}
+            placeholder="输入托盘提示文本"
+          />
+        </div>
+
+        {/* 通知测试 */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium">通知测试</label>
+          <Button
+            variant="outline"
+            onClick={handleTestNotification}
+            className="w-full"
+          >
+            发送测试通知
+          </Button>
+        </div>
+
+        {/* 托盘行为设置 */}
+        <div className="space-y-4">
+          <h4 className="font-medium">托盘行为</h4>
+          <div className="text-sm text-muted-foreground space-y-1">
+            <p>• 左键单击：切换主窗口显示/隐藏</p>
+            <p>• 双击：切换悬浮窗显示/隐藏</p>
+            <p>• 右键：显示上下文菜单</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+## 5. API服务层
+
+### 5.1 API服务架构
 ```typescript
 // services/api.ts
 class ApiService {
@@ -505,7 +1790,7 @@ class ApiService {
 }
 ```
 
-### 4.2 错误处理
+### 5.2 错误处理
 ```typescript
 // services/error.ts
 class ApiError extends Error {

@@ -110,9 +110,9 @@ export const useTimer = () => {
   // 获取今日统计
   const getTodayStats = useCallback(() => {
     const today = new Date().toDateString()
-    const todaySessions = sessionHistory.filter(session => 
-      new Date(session.startTime).toDateString() === today
-    )
+    const todaySessions = sessionHistory
+      .filter(session => !!session.startTime)
+      .filter(session => new Date(session.startTime as string).toDateString() === today)
     
     return {
       totalSessions: todaySessions.length,
@@ -131,9 +131,9 @@ export const useTimer = () => {
   const getWeekStats = useCallback(() => {
     const now = new Date()
     const weekStart = new Date(now.setDate(now.getDate() - now.getDay()))
-    const weekSessions = sessionHistory.filter(session => 
-      new Date(session.startTime) >= weekStart
-    )
+    const weekSessions = sessionHistory
+      .filter(session => !!session.startTime)
+      .filter(session => new Date(session.startTime as string) >= weekStart)
     
     return {
       totalSessions: weekSessions.length,

@@ -609,6 +609,250 @@ interface ShowNotificationParams {
 }
 ```
 
+### 6. 系统托盘 API
+
+系统托盘提供了在后台运行时的应用控制功能，支持显示/隐藏主窗口、悬浮窗以及退出应用等操作。
+
+#### 6.1 显示系统托盘
+```typescript
+// API 调用
+await invoke('show_tray');
+
+// 说明
+// 显示系统托盘图标，通常在应用启动时自动创建
+```
+
+#### 6.2 隐藏系统托盘
+```typescript
+// API 调用
+await invoke('hide_tray');
+
+// 说明
+// 隐藏系统托盘图标
+```
+
+#### 6.3 设置托盘图标
+```typescript
+// API 调用
+await invoke('set_tray_icon', {
+  icon_path: 'icons/tray-icon.png'
+});
+
+// 参数
+interface SetTrayIconParams {
+  icon_path: string;  // 图标文件路径
+}
+
+// 说明
+// 更新系统托盘图标
+```
+
+#### 6.4 设置托盘提示文本
+```typescript
+// API 调用
+await invoke('set_tray_tooltip', {
+  tooltip: '汐律 - 智能时间管理工具'
+});
+
+// 参数
+interface SetTrayTooltipParams {
+  tooltip: string;  // 提示文本
+}
+
+// 说明
+// 设置鼠标悬停在托盘图标上时显示的提示文本
+```
+
+#### 6.5 更新托盘菜单
+```typescript
+// API 调用
+await invoke('update_tray_menu', {
+  show_item: true,
+  hide_item: true,
+  float_item: true,
+  quit_item: true,
+  timer_status: 'running' // 'running' | 'paused' | 'stopped'
+});
+
+// 参数
+interface UpdateTrayMenuParams {
+  show_item?: boolean;     // 是否显示"显示主窗口"菜单项
+  hide_item?: boolean;     // 是否显示"隐藏主窗口"菜单项
+  float_item?: boolean;    // 是否显示"显示悬浮窗"菜单项
+  quit_item?: boolean;     // 是否显示"退出"菜单项
+  timer_status?: string;   // 计时器状态，用于动态更新菜单文本
+}
+
+// 说明
+// 动态更新系统托盘菜单项的状态和文本
+```
+
+#### 6.6 获取托盘可见性
+```typescript
+// API 调用
+const isVisible = await invoke<boolean>('is_tray_visible');
+
+// 返回值
+boolean: 系统托盘是否可见
+```
+
+#### 6.7 托盘菜单事件处理
+系统托盘支持以下菜单事件，这些事件在后端已经实现，前端可以通过监听状态变化来响应：
+
+```typescript
+// 菜单项事件
+type TrayMenuEvent = 
+  | 'show'      // 显示主窗口
+  | 'hide'      // 隐藏主窗口
+  | 'float'     // 切换悬浮窗
+  | 'quit';     // 退出应用
+
+// 托盘图标事件
+type TrayIconEvent = 
+  | 'left_click'    // 左键单击：切换主窗口显示/隐藏
+  | 'double_click'  // 双击：切换悬浮窗显示/隐藏
+  | 'right_click';   // 右键：显示上下文菜单
+```
+
+#### 6.8 托盘状态查询
+```typescript
+// API 调用
+const trayState = await invoke<TrayState>('get_tray_state');
+
+// 返回值
+interface TrayState {
+  is_visible: boolean;        // 托盘是否可见
+  main_window_visible: boolean; // 主窗口是否可见
+  float_window_visible: boolean; // 悬浮窗是否可见
+  timer_status: string;       // 计时器状态
+}
+
+// 说明
+// 获取当前系统托盘和窗口的状态信息
+```
+
+#### 6.9 设置托盘右键菜单
+```typescript
+// API 调用
+await invoke('set_tray_context_menu', {
+  items: [
+    { id: 'show', text: '显示主窗口', enabled: true },
+    { id: 'hide', text: '隐藏主窗口', enabled: true },
+    { id: 'separator', text: '-', enabled: true },
+    { id: 'float', text: '显示悬浮窗', enabled: true },
+    { id: 'quit', text: '退出应用', enabled: true }
+  ]
+});
+
+// 参数
+interface TrayMenuItem {
+  id: string;           // 菜单项ID
+  text: string;         // 显示文本
+  enabled: boolean;     // 是否启用
+  checked?: boolean;    // 是否选中（仅用于复选框菜单项）
+  separator?: boolean;  // 是否为分隔线
+}
+
+interface SetTrayContextMenuParams {
+  items: TrayMenuItem[]; // 菜单项列表
+}
+
+// 说明
+// 自定义系统托盘的右键上下文菜单
+```
+
+#### 6.10 托盘通知集成
+```typescript
+// API 调用
+await invoke('show_tray_notification', {
+  title: '计时完成',
+  body: '您的一个番茄钟已完成！',
+  icon: 'info',
+  duration: 5000
+});
+
+// 参数
+interface ShowTrayNotificationParams {
+  title: string;        // 通知标题
+  body: string;         // 通知内容
+  icon?: string;        // 通知图标类型：'info' | 'warning' | 'error' | 'success'
+  duration?: number;    // 显示时长（毫秒）
+}
+
+// 说明
+// 通过系统托盘显示桌面通知
+```
+
+### 系统托盘使用示例
+
+```typescript
+// 完整的系统托盘管理示例
+class TrayManager {
+  // 初始化系统托盘
+  static async init() {
+    try {
+      await invoke('show_tray');
+      await invoke('set_tray_tooltip', '汐律 - 智能时间管理工具');
+      await this.updateTrayMenu();
+    } catch (error) {
+      console.error('初始化系统托盘失败:', error);
+    }
+  }
+
+  // 更新托盘菜单
+  static async updateTrayMenu(timerStatus = 'stopped') {
+    try {
+      await invoke('update_tray_menu', {
+        show_item: true,
+        hide_item: true,
+        float_item: true,
+        quit_item: true,
+        timer_status: timerStatus
+      });
+    } catch (error) {
+      console.error('更新托盘菜单失败:', error);
+    }
+  }
+
+  // 显示托盘通知
+  static async showNotification(title: string, body: string) {
+    try {
+      await invoke('show_tray_notification', {
+        title,
+        body,
+        icon: 'info',
+        duration: 5000
+      });
+    } catch (error) {
+      console.error('显示托盘通知失败:', error);
+    }
+  }
+
+  // 获取托盘状态
+  static async getState() {
+    try {
+      return await invoke<TrayState>('get_tray_state');
+    } catch (error) {
+      console.error('获取托盘状态失败:', error);
+      return null;
+    }
+  }
+}
+
+// 在应用启动时初始化系统托盘
+TrayManager.init();
+
+// 在计时器状态变化时更新托盘
+timerStore.subscribe((state) => {
+  TrayManager.updateTrayMenu(state.status);
+});
+
+// 在计时完成时显示通知
+if (timerCompleted) {
+  TrayManager.showNotification('计时完成', '您的一个番茄钟已完成！');
+}
+```
+
 ## 错误处理
 
 ### 错误类型
@@ -772,6 +1016,13 @@ async function invokeApi<T>(command: ApiCommand, params?: any): Promise<T> {
 
 ## 更新日志
 
+### v1.2.0 (2025-09-12)
+- ✅ 补充系统托盘相关API接口文档
+- ✅ 添加系统托盘管理功能接口
+- ✅ 完善托盘菜单和事件处理说明
+- ✅ 添加托盘状态查询和控制接口
+- ✅ 提供完整的托盘使用示例代码
+
 ### v1.1.0 (2025-09-11)
 - ✅ 修复 create_work 接口参数名不匹配问题
 - ✅ 添加作品归档/取消归档功能
@@ -795,4 +1046,4 @@ async function invokeApi<T>(command: ApiCommand, params?: any): Promise<T> {
 
 ---
 
-*本文档最后更新时间：2025年9月11日*
+*本文档最后更新时间：2025年9月12日*

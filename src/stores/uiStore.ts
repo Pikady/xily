@@ -4,7 +4,7 @@ import { UIState, ViewMode } from '@/types/ui'
 import { ThemeMode } from '@/types/app'
 import { immer } from 'zustand/middleware/immer'
 
-interface UIStoreState {
+export interface UIStoreState {
   // 主题
   theme: ThemeMode
   

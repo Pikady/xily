@@ -5,7 +5,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Calendar, Filter, RotateCcw } from 'lucide-react';
-import { AnalyticsFilters, TimerMode } from '@/types/analytics';
+import { AnalyticsFilters } from '@/types/analytics';
+import { TimerMode } from '@/types/timer';
 import { Work } from '@/types/work';
 import { formatDate } from '@/utils/format';
 
@@ -54,7 +55,8 @@ export function DataFilter({ filters, onFiltersChange, works, onRefresh }: DataF
         endDate = new Date(today.getFullYear(), today.getMonth(), 1);
         break;
       default: // 最近N天
-        startDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() - range.days + 1);
+        const n = typeof range.days === 'number' ? range.days : 0;
+        startDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() - n + 1);
         endDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
         break;
     }

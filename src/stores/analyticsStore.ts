@@ -1,11 +1,10 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { persist } from 'zustand/middleware';
-import { AnalyticsFilters, TimeDistribution, DailyStats, WeeklyStats, MonthlyStats, TrendData, ExportData, ExportFormat } from '@/types/analytics';
-import { TimeRecord } from '@/types/timer';
+import { AnalyticsFilters, TimeDistribution, DailyStats, WeeklyStats, MonthlyStats, TrendData, ExportData, ExportFormat, TimeRecord } from '@/types/analytics';
 import { analyticsAPI } from '@/services/api';
 
-interface AnalyticsState {
+export interface AnalyticsState {
   // 数据状态
   timeRecords: TimeRecord[];
   timeDistribution: TimeDistribution[];
@@ -131,14 +130,25 @@ export const useAnalyticsStore = create<AnalyticsState>()(
         }
       },
       
-      // 数据导出
-      exportData: async (format: ExportFormat, filters) => {
+      // 数据导出（前端聚合实现，避免与后端参数签名不匹配）
+      exportData: async (_format: ExportFormat, _filters) => {
+        set({ loading: true, error: null });
         try {
-          set({ loading: true, error: null });
-          const currentFilters = filters || get().filters;
-          const data = await analyticsAPI.exportData(format, currentFilters);
+          const { timeRecords, dailyStats } = get();
+          const summary = {
+            total_time: dailyStats.reduce((s, d) => s + d.total_time, 0),
+            explore_time: dailyStats.reduce((s, d) => s + d.explore_time, 0),
+            utilize_time: dailyStats.reduce((s, d) => s + d.utilize_time, 0),
+            session_count: dailyStats.reduce((s, d) => s + d.session_count, 0),
+            completion_rate: 0,
+            date_range: {
+              start: dailyStats[0]?.date ?? '',
+              end: dailyStats[dailyStats.length - 1]?.date ?? ''
+            }
+          };
+          const result: ExportData = { time_records: timeRecords as TimeRecord[], summary };
           set({ loading: false });
-          return data;
+          return result;
         } catch (error) {
           set({ error: error instanceof Error ? error.message : '导出数据失败', loading: false });
           throw error;

@@ -6,6 +6,8 @@ mod commands;
 
 use services::{WorksService, TimerService, AnalyticsService};
 use services::window::WindowManager;
+use services::tray::create_tray;
+use services::get_tray_manager;
 use models::{Work, TimerSession, TimerConfig, TimeRecord};
 use commands::*;
 
@@ -13,10 +15,22 @@ use commands::*;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .setup(|_app| {
+        .setup(|app| {
             // 初始化数据库
             if let Err(e) = database::init_database() {
                 eprintln!("Failed to initialize database: {}", e);
+            }
+            
+            // 初始化系统托盘
+            let tray_manager = get_tray_manager();
+            match create_tray(app.handle()) {
+                Ok(tray) => {
+                    tray_manager.set_tray_icon(tray);
+                    println!("系统托盘初始化成功");
+                }
+                Err(e) => {
+                    eprintln!("Failed to create system tray: {}", e);
+                }
             }
             
             Ok(())
@@ -66,6 +80,18 @@ pub fn run() {
             get_app_version,
             get_app_name,
             quit_app,
+            show_notification,
+            
+            // 系统托盘
+            show_tray,
+            hide_tray,
+            set_tray_icon,
+            set_tray_tooltip,
+            update_tray_menu,
+            set_tray_context_menu,
+            show_tray_notification,
+            is_tray_visible,
+            get_tray_state,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -5,7 +5,7 @@ import { TimerAPI } from '@/services/api'
 import { immer } from 'zustand/middleware/immer'
 import { useAnalyticsStore } from './analyticsStore'
 
-interface TimerStoreState {
+export interface TimerStoreState {
   // 状态
   state: TimerState
   mode: TimerMode

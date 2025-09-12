@@ -26,7 +26,8 @@ export function TimeDistributionCharts({ data, loading, error }: TimeDistributio
       name: item.work_name,
       explore: item.explore_time,
       utilize: item.utilize_time,
-      total: item.total_time
+      total: item.total_time,
+      value: item.explore_time
     }));
   }, [data]);
 

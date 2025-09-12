@@ -6,7 +6,7 @@ import { WorkFormData } from '@/types/frontend'
 import { immer } from 'zustand/middleware/immer'
 import { useAnalyticsStore } from './analyticsStore'
 
-interface WorksState {
+export interface WorksState {
   works: Work[]
   currentWork: Work | null
   stats: WorkStats | null

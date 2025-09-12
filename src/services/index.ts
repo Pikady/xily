@@ -7,6 +7,9 @@ export {
   SystemAPI
 } from './api'
 
+// 导出系统托盘服务
+export { trayService, TrayService } from './trayService'
+
 // 导出所有Hooks
 export {
   useAsync

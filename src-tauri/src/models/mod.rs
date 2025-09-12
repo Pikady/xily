@@ -93,3 +93,28 @@ pub struct DailyStats {
     pub explore_time: i32,
     pub utilize_time: i32,
 }
+
+// 托盘相关数据模型
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
+pub struct TrayMenuItem {
+    pub id: String,
+    pub text: String,
+    pub enabled: bool,
+    pub checked: Option<bool>,
+    pub separator: Option<bool>,
+    pub icon: Option<String>,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct TrayStateResponse {
+    pub is_visible: bool,
+    pub main_window_visible: bool,
+    pub float_window_visible: bool,
+    pub timer_status: String,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct TrayPosition {
+    pub x: f64,
+    pub y: f64,
+}

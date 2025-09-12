@@ -5,14 +5,14 @@ import { ExportData, TimeRecord, TimeDistribution, DailyStats, WeeklyStats, Mont
 import { WorkFormData, AnalyticsData } from '@/types/frontend'
 
 // API响应基础类型
-interface ApiResponse<T> {
+export interface ApiResponse<T> {
   data: T
   message: string
   success: boolean
 }
 
 // API错误类型
-interface ApiError {
+export interface APIError {
   code: string
   message: string
   details?: any
@@ -160,7 +160,28 @@ export class AnalyticsAPI {
 
   // 获取时间分布
   static async getTimeDistribution(filters?: AnalyticsFilters): Promise<TimeDistribution[]> {
-    return tauriInvoke<TimeDistribution[]>('get_time_distribution', { filters })
+    // 后端实际提供的是 get_work_time_distribution
+    const workId = filters?.work_ids && filters.work_ids.length > 0 ? filters.work_ids[0] : undefined
+    const startDate = filters?.date_range?.start
+    const endDate = filters?.date_range?.end
+
+    // 直接复用后端统计接口
+    const result = await tauriInvoke<any[]>('get_work_time_distribution', {
+      workId,
+      startDate,
+      endDate
+    })
+
+    // 尝试映射为 TimeDistribution 结构（若后端字段一致则直接返回）
+    return (result || []).map((r: any) => ({
+      work_id: r.work_id ?? r.workId ?? r.id,
+      work_name: r.work_name ?? r.workName ?? r.name,
+      work_color: r.work_color ?? r.workColor ?? r.color,
+      explore_time: r.explore_time ?? 0,
+      utilize_time: r.utilize_time ?? 0,
+      total_time: r.total_time ?? r.totalTime ?? 0,
+      percentage: r.percentage ?? 0
+    })) as TimeDistribution[]
   }
 
   // 获取每日统计

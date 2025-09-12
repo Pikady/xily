@@ -31,7 +31,11 @@ export function Dashboard() {
     fetchData
   } = useAnalyticsStore();
 
-  const { works } = useWorksStore();
+  const { works: worksRaw } = useWorksStore();
+  const works = Array.isArray(worksRaw) ? worksRaw : [];
+  const dailyStatsList = Array.isArray(dailyStats) ? dailyStats : [];
+  const timeDistributionList = Array.isArray(timeDistribution) ? timeDistribution : [];
+  const trendDataList = Array.isArray(trendData) ? trendData : [];
 
   // 初始化数据和筛选器
   useEffect(() => {
@@ -52,7 +56,7 @@ export function Dashboard() {
 
   // 筛选器变化时获取数据
   useEffect(() => {
-    if (filters.date_range.start && filters.date_range.end) {
+    if (filters && filters.date_range?.start && filters.date_range?.end) {
       fetchData('all');
     }
   }, [filters, fetchData]);
@@ -60,19 +64,19 @@ export function Dashboard() {
   
   // 计算统计数据
   const stats = useMemo(() => {
-    const totalTime = dailyStats.reduce((sum, stat) => sum + stat.total_time, 0);
-    const exploreTime = dailyStats.reduce((sum, stat) => sum + stat.explore_time, 0);
-    const utilizeTime = dailyStats.reduce((sum, stat) => sum + stat.utilize_time, 0);
+    const totalTime = dailyStatsList.reduce((sum, stat) => sum + stat.total_time, 0);
+    const exploreTime = dailyStatsList.reduce((sum, stat) => sum + stat.explore_time, 0);
+    const utilizeTime = dailyStatsList.reduce((sum, stat) => sum + stat.utilize_time, 0);
     
-    const totalSessions = dailyStats.reduce((sum, stat) => sum + stat.session_count, 0);
-    const completedSessions = dailyStats.reduce((sum, stat) => sum + stat.completed_sessions, 0);
+    const totalSessions = dailyStatsList.reduce((sum, stat) => sum + stat.session_count, 0);
+    const completedSessions = dailyStatsList.reduce((sum, stat) => sum + stat.completed_sessions, 0);
     const averageSessionTime = totalSessions > 0 ? totalTime / totalSessions : 0;
 
-    const activeWorks = timeDistribution.length;
-    const topWork = timeDistribution.length > 0 ? {
-      name: timeDistribution[0].work_name,
-      time: timeDistribution[0].total_time,
-      percentage: timeDistribution[0].percentage
+    const activeWorks = timeDistributionList.length;
+    const topWork = timeDistributionList.length > 0 ? {
+      name: timeDistributionList[0].work_name,
+      time: timeDistributionList[0].total_time,
+      percentage: timeDistributionList[0].percentage
     } : undefined;
 
     return {
@@ -85,13 +89,13 @@ export function Dashboard() {
       activeWorks,
       topWork
     };
-  }, [dailyStats, timeDistribution]);
+  }, [dailyStatsList, timeDistributionList]);
 
   // 计算今日统计
   const todayStats = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];
-    return dailyStats.find(stat => stat.date === today);
-  }, [dailyStats]);
+    return dailyStatsList.find(stat => stat.date === today);
+  }, [dailyStatsList]);
 
   return (
     <div className="space-y-6">
@@ -166,7 +170,7 @@ export function Dashboard() {
 
         <TabsContent value="distribution" className="space-y-6">
           <TimeDistributionCharts
-            data={timeDistribution}
+            data={timeDistributionList}
             loading={analyticsLoading}
             error={analyticsError ?? undefined}
           />
@@ -174,7 +178,7 @@ export function Dashboard() {
 
         <TabsContent value="trends" className="space-y-6">
           <TrendAnalysisCharts
-            data={trendData}
+            data={trendDataList}
             loading={analyticsLoading}
             error={analyticsError ?? undefined}
           />

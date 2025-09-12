@@ -1,5 +1,11 @@
-// 重新导出前端类型
-export type { UIState, ViewMode, WorkFormData, AnalyticsData, UserPreferences, ToastMessage, ModalState } from './frontend';
+// 重新导出前端类型（避免与 app.ts 中同名类型冲突，使用别名）
+export type {
+  UIState,
+  ViewMode,
+  WorkFormData,
+  AnalyticsData,
+  UserPreferences
+} from './frontend';
 
 export type ButtonVariant = 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link' | 'explore' | 'utilize';
 export type ButtonSize = 'default' | 'sm' | 'lg' | 'icon';

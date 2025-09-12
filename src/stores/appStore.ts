@@ -1,9 +1,10 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { AppState, UserPreferences, AppSettings } from '@/types/app'
+import { AppState, AppSettings } from '@/types/app'
+import { UserPreferences } from '@/types/frontend'
 import { immer } from 'zustand/middleware/immer'
 
-interface AppStoreState {
+export interface AppStoreState {
   // 应用状态
   state: AppState
   initialized: boolean
@@ -68,32 +69,26 @@ export const useAppStore = create<AppStoreState>()(
       firstLaunch: true,
       
       preferences: {
+        theme: 'light',
         language: 'zh-CN',
-        dateFormat: 'YYYY-MM-DD',
-        timeFormat: '24h',
-        startOfWeek: 'monday',
-        defaultMode: 'explore',
-        notifications: {
-          sessionComplete: true,
-          breakComplete: true,
-          dailyGoal: true,
-          weeklyReport: false
-        }
+        autoStart: false,
+        notifications: true,
+        sounds: true
       },
       
       settings: {
-        autoStart: false,
-        minimizeToTray: true,
-        startupLaunch: false,
-        dataBackup: {
-          enabled: true,
-          interval: 'daily',
-          lastBackup: null
-        },
-        privacy: {
-          analytics: false,
-          crashReports: true,
-          telemetry: false
+        theme: 'light',
+        language: 'zh-CN',
+        auto_start: false,
+        notifications: true,
+        sounds: true,
+        shortcuts: {
+          toggle_timer: 'Ctrl+T',
+          start_pause: 'Space',
+          stop_timer: 'Ctrl+S',
+          toggle_sidebar: 'Ctrl+B',
+          toggle_float_window: 'Ctrl+F',
+          quick_add_work: 'Ctrl+N'
         }
       },
       
@@ -158,17 +153,11 @@ export const useAppStore = create<AppStoreState>()(
       resetPreferences: () => {
         set((draft) => {
           draft.preferences = {
+            theme: 'light',
             language: 'zh-CN',
-            dateFormat: 'YYYY-MM-DD',
-            timeFormat: '24h',
-            startOfWeek: 'monday',
-            defaultMode: 'explore',
-            notifications: {
-              sessionComplete: true,
-              breakComplete: true,
-              dailyGoal: true,
-              weeklyReport: false
-            }
+            autoStart: false,
+            notifications: true,
+            sounds: true
           }
         })
       },
@@ -183,18 +172,18 @@ export const useAppStore = create<AppStoreState>()(
       resetSettings: () => {
         set((draft) => {
           draft.settings = {
-            autoStart: false,
-            minimizeToTray: true,
-            startupLaunch: false,
-            dataBackup: {
-              enabled: true,
-              interval: 'daily',
-              lastBackup: null
-            },
-            privacy: {
-              analytics: false,
-              crashReports: true,
-              telemetry: false
+            theme: 'light',
+            language: 'zh-CN',
+            auto_start: false,
+            notifications: true,
+            sounds: true,
+            shortcuts: {
+              toggle_timer: 'Ctrl+T',
+              start_pause: 'Space',
+              stop_timer: 'Ctrl+S',
+              toggle_sidebar: 'Ctrl+B',
+              toggle_float_window: 'Ctrl+F',
+              quick_add_work: 'Ctrl+N'
             }
           }
         })

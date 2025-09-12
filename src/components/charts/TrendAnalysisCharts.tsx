@@ -24,7 +24,8 @@ export function TrendAnalysisCharts({
     return data.map(item => ({
       date: item.date,
       value: item.value,
-      formattedDate: formatDate(item.date, 'short')
+      formattedDate: formatDate(item.date, 'short'),
+      name: formatDate(item.date, 'short')
     }));
   }, [data]);
 
@@ -35,7 +36,9 @@ export function TrendAnalysisCharts({
       explore: item.explore_value || 0,
       utilize: item.utilize_value || 0,
       total: item.value,
-      formattedDate: formatDate(item.date, 'short')
+      formattedDate: formatDate(item.date, 'short'),
+      name: formatDate(item.date, 'short')
+      ,value: item.explore_value || 0
     }));
   }, [data]);
 
