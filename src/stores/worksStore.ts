@@ -2,7 +2,9 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { Work, CreateWorkParams, UpdateWorkParams, WorkStats } from '@/types/work'
 import { WorksAPI } from '@/services/api'
+import { WorkFormData } from '@/types/frontend'
 import { immer } from 'zustand/middleware/immer'
+import { useAnalyticsStore } from './analyticsStore'
 
 interface WorksState {
   works: Work[]
@@ -35,7 +37,7 @@ export const useWorksStore = create<WorksState>()(
       loading: false,
       error: null,
 
-      addWork: async (workData: CreateWorkParams) => {
+      addWork: async (workData: WorkFormData) => {
         try {
           set({ loading: true, error: null })
           const newWork = await WorksAPI.createWork(workData)
@@ -44,13 +46,17 @@ export const useWorksStore = create<WorksState>()(
             state.works.push(newWork)
             state.loading = false
           })
+          
+          // 触发analytics数据更新
+          const analyticsStore = useAnalyticsStore.getState()
+          analyticsStore.fetchData('all')
         } catch (error) {
           set({ error: error instanceof Error ? error.message : 'Failed to add work', loading: false })
           throw error
         }
       },
 
-      updateWork: async (id: number, workData: Partial<UpdateWorkParams>) => {
+      updateWork: async (id: number, workData: Partial<WorkFormData>) => {
         try {
           set({ loading: true, error: null })
           const updatedWork = await WorksAPI.updateWork(id.toString(), workData)
@@ -65,6 +71,10 @@ export const useWorksStore = create<WorksState>()(
             }
             state.loading = false
           })
+          
+          // 触发analytics数据更新
+          const analyticsStore = useAnalyticsStore.getState()
+          analyticsStore.fetchData('all')
         } catch (error) {
           set({ error: error instanceof Error ? error.message : 'Failed to update work', loading: false })
           throw error
@@ -83,6 +93,10 @@ export const useWorksStore = create<WorksState>()(
             }
             state.loading = false
           })
+          
+          // 触发analytics数据更新
+          const analyticsStore = useAnalyticsStore.getState()
+          analyticsStore.fetchData('all')
         } catch (error) {
           set({ error: error instanceof Error ? error.message : 'Failed to delete work', loading: false })
           throw error
@@ -92,7 +106,7 @@ export const useWorksStore = create<WorksState>()(
       archiveWork: async (id: number) => {
         try {
           set({ loading: true, error: null })
-          await WorksAPI.updateWork(id.toString(), { is_archived: true })
+          await WorksAPI.archiveWork(id.toString())
           
           set((state) => {
             const workIndex = state.works.findIndex(w => w.id === id)
@@ -110,7 +124,7 @@ export const useWorksStore = create<WorksState>()(
       unarchiveWork: async (id: number) => {
         try {
           set({ loading: true, error: null })
-          await WorksAPI.updateWork(id.toString(), { is_archived: false })
+          await WorksAPI.unarchiveWork(id.toString())
           
           set((state) => {
             const workIndex = state.works.findIndex(w => w.id === id)

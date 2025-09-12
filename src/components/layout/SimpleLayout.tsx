@@ -4,11 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Timer } from 'lucide-react';
 import { useFloatWindow } from '@/hooks/useFloatWindow';
 
-interface SimpleLayoutProps {
-  children: React.ReactNode;
-}
-
-export function SimpleLayout({ children }: SimpleLayoutProps) {
+export function SimpleLayout() {
   const { toggleFloatWindow } = useFloatWindow();
 
   return (

@@ -16,7 +16,6 @@ import { TimeDistributionCharts } from '@/components/charts/TimeDistributionChar
 import { TrendAnalysisCharts } from '@/components/charts/TrendAnalysisCharts';
 import { DataFilter } from '@/components/charts/DataFilter';
 import { DataStatusIndicator } from '@/components/charts/DataStatusIndicator';
-import { useDataSync } from '@/hooks/useDataSync';
 import { formatDuration, getDaysBetween } from '@/utils/format';
 
 export function Dashboard() {
@@ -28,25 +27,13 @@ export function Dashboard() {
     filters,
     loading: analyticsLoading,
     error: analyticsError,
-    fetchTimeDistribution,
-    fetchDailyStats,
-    fetchWeeklyStats,
-    fetchTrendData,
     setFilters,
-    refreshAllData
+    fetchData
   } = useAnalyticsStore();
 
   const { works } = useWorksStore();
-  const { timerConfig, timerHistory } = useTimerStore();
 
-  // 使用数据同步hook
-  const { refresh, loading: syncLoading, error: syncError, lastSyncTime } = useDataSync({
-    interval: 30000, // 30秒自动更新
-    enabled: true,
-    retryCount: 3
-  });
-
-  // 初始化数据
+  // 初始化数据和筛选器
   useEffect(() => {
     const initializeFilters = () => {
       const today = new Date();
@@ -63,13 +50,14 @@ export function Dashboard() {
     initializeFilters();
   }, [setFilters]);
 
-  // 获取分析数据
+  // 筛选器变化时获取数据
   useEffect(() => {
     if (filters.date_range.start && filters.date_range.end) {
-      refreshAllData();
+      fetchData('all');
     }
-  }, [filters, refreshAllData]);
+  }, [filters, fetchData]);
 
+  
   // 计算统计数据
   const stats = useMemo(() => {
     const totalTime = dailyStats.reduce((sum, stat) => sum + stat.total_time, 0);
@@ -135,14 +123,14 @@ export function Dashboard() {
               filters={filters}
               onFiltersChange={setFilters}
               works={works}
-              onRefresh={refresh}
+              onRefresh={() => fetchData('all')}
             />
             <DataStatusIndicator
-              loading={syncLoading}
-              error={syncError}
-              lastSyncTime={lastSyncTime}
-              onRefresh={refresh}
-              autoRefresh={true}
+              loading={analyticsLoading}
+              error={analyticsError ?? undefined}
+              lastSyncTime={new Date()}
+              onRefresh={() => fetchData('all')}
+              autoRefresh={false}
             />
           </div>
         </CardContent>
@@ -180,7 +168,7 @@ export function Dashboard() {
           <TimeDistributionCharts
             data={timeDistribution}
             loading={analyticsLoading}
-            error={analyticsError}
+            error={analyticsError ?? undefined}
           />
         </TabsContent>
 
@@ -188,7 +176,7 @@ export function Dashboard() {
           <TrendAnalysisCharts
             data={trendData}
             loading={analyticsLoading}
-            error={analyticsError}
+            error={analyticsError ?? undefined}
           />
         </TabsContent>
 

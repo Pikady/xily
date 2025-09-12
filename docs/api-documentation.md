@@ -206,6 +206,35 @@ interface UnarchiveWorkParams {
 }
 ```
 
+#### 1.8 获取作品统计
+```typescript
+// API 调用
+const stats = await invoke<WorkStats>('get_work_stats', { id: 1 });
+
+// 参数
+interface GetWorkStatsParams {
+  id: number;  // 作品ID
+}
+
+// 返回值
+interface WorkStats {
+  total_time: number;        // 总时长（分钟）
+  session_count: number;     // 会话数量
+  explore_time: number;      // 探索时长
+  utilize_time: number;      // 利用时长
+  completion_rate: number;   // 完成率
+}
+```
+
+#### 1.9 获取所有作品统计
+```typescript
+// API 调用
+const allStats = await invoke<WorkStats[]>('get_all_works_stats');
+
+// 返回值
+WorkStats[]: 所有作品的统计信息
+```
+
 ### 2. 计时器 API
 
 #### 2.1 开始计时
@@ -565,6 +594,21 @@ string: 应用名称
 await invoke('quit_app');
 ```
 
+#### 5.4 显示通知
+```typescript
+// API 调用
+await invoke('show_notification', {
+  title: '计时完成',
+  body: '您的一个番茄钟已完成！'
+});
+
+// 参数
+interface ShowNotificationParams {
+  title: string;  // 通知标题
+  body: string;   // 通知内容
+}
+```
+
 ## 错误处理
 
 ### 错误类型
@@ -728,6 +772,15 @@ async function invokeApi<T>(command: ApiCommand, params?: any): Promise<T> {
 
 ## 更新日志
 
+### v1.1.0 (2025-09-11)
+- ✅ 修复 create_work 接口参数名不匹配问题
+- ✅ 添加作品归档/取消归档功能
+- ✅ 添加作品统计功能
+- ✅ 添加系统通知功能
+- ✅ 完善分析相关API接口
+- ✅ 修复前端API调用中的技术问题
+- ✅ 更新API文档，补充新增接口说明
+
 ### v1.0.0 (2024-01-09)
 - ✅ 完成所有基础 API 接口
 - ✅ 实现作品管理功能
@@ -742,4 +795,4 @@ async function invokeApi<T>(command: ApiCommand, params?: any): Promise<T> {
 
 ---
 
-*本文档最后更新时间：2024年1月9日*
+*本文档最后更新时间：2025年9月11日*

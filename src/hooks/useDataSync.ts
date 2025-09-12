@@ -20,7 +20,7 @@ export function useDataSync(options: UseDataSyncOptions = {}) {
     filters,
     loading,
     error,
-    refreshAllData,
+    fetchData,
     setLoading,
     setError
   } = useAnalyticsStore();
@@ -36,7 +36,7 @@ export function useDataSync(options: UseDataSyncOptions = {}) {
     try {
       setLoading(true);
       setError(null);
-      await refreshAllData();
+      await fetchData('all');
       lastSyncTimeRef.current = new Date();
       retryCountRef.current = 0;
     } catch (error) {
@@ -51,7 +51,7 @@ export function useDataSync(options: UseDataSyncOptions = {}) {
     } finally {
       setLoading(false);
     }
-  }, [loading, refreshAllData, setLoading, setError, retryCount, retryDelay]);
+  }, [loading, fetchData, setLoading, setError, retryCount, retryDelay]);
 
   // 自动更新逻辑
   useEffect(() => {

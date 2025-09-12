@@ -10,7 +10,7 @@ export interface WorkFormData {
   name: string;
   description?: string;
   color?: string;
-  targetHours: number;
+  target_hours: number;
 }
 
 // 前端分析数据展示

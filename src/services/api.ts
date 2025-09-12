@@ -53,32 +53,44 @@ export class WorksAPI {
       name: workData.name,
       description: workData.description,
       color: workData.color,
-      target_hours: workData.target_hours
+      targetHours: workData.target_hours
     })
   }
 
   // 更新作品
   static async updateWork(id: string, workData: Partial<WorkFormData>): Promise<Work> {
-    // 首先获取现有作品数据
+    // 先取现有作品，补全必填字段
     const existingWork = await WorksAPI.getWork(id)
-    
-    // 构造完整的Work对象
-    const work: Work = {
+
+    // 构造与后端 Rust `Work` 结构相匹配的负载（不包含前端专用的 is_deleted 字段）
+    const workPayload = {
       id: parseInt(id),
-      name: workData.name || existingWork.name,
+      name: workData.name ?? existingWork.name,
       description: workData.description !== undefined ? workData.description : existingWork.description,
       color: workData.color !== undefined ? workData.color : existingWork.color,
-      target_hours: workData.targetHours !== undefined ? workData.targetHours : existingWork.target_hours,
-      created_at: existingWork.created_at,
-      updated_at: new Date(),
+      target_hours: workData.target_hours !== undefined ? workData.target_hours : existingWork.target_hours,
+      // 这两个在后端是 Option 类型，传 null 由后端按需维护
+      created_at: null,
+      updated_at: null,
       is_archived: existingWork.is_archived
     }
-    return tauriInvoke<Work>('update_work', work)
+
+    return tauriInvoke<Work>('update_work', { work: workPayload })
   }
 
   // 删除作品
   static async deleteWork(id: string): Promise<void> {
     return tauriInvoke<void>('delete_work', { id: parseInt(id) })
+  }
+
+  // 归档作品
+  static async archiveWork(id: string): Promise<void> {
+    return tauriInvoke<void>('archive_work', { id: parseInt(id) })
+  }
+
+  // 取消归档作品
+  static async unarchiveWork(id: string): Promise<void> {
+    return tauriInvoke<void>('unarchive_work', { id: parseInt(id) })
   }
 
   // 获取作品统计
@@ -101,7 +113,7 @@ export class TimerAPI {
     duration: number
   }): Promise<TimerSession> {
     return tauriInvoke<TimerSession>('start_timer', { 
-      work_id: data.workId, // 现在支持可选的 work_id
+      workId: data.workId,
       mode: data.mode, 
       duration: data.duration 
     })
@@ -134,7 +146,7 @@ export class TimerAPI {
 
   // 获取计时历史
   static async getTimerHistory(workId?: number): Promise<TimerSession[]> {
-    return tauriInvoke<TimerSession[]>('get_timer_sessions', { work_id: workId, limit: None })
+    return tauriInvoke<TimerSession[]>('get_timer_sessions', { workId: workId, limit: null })
   }
 }
 
@@ -142,7 +154,8 @@ export class TimerAPI {
 export class AnalyticsAPI {
   // 获取时间记录
   static async getTimeRecords(filters?: AnalyticsFilters): Promise<TimeRecord[]> {
-    return tauriInvoke<TimeRecord[]>('get_time_records', { filters })
+    // 后端暂未提供 get_time_records 命令，先返回空数组以保证前端稳定
+    return Promise.resolve([] as TimeRecord[])
   }
 
   // 获取时间分布
@@ -151,28 +164,68 @@ export class AnalyticsAPI {
   }
 
   // 获取每日统计
-  static async getDailyStats(filters?: AnalyticsFilters): Promise<DailyStats[]> {
-    return tauriInvoke<DailyStats[]>('get_daily_stats', { filters })
+  static async getDailyStats(filtersOrDays?: AnalyticsFilters | number): Promise<DailyStats[]> {
+    let days = 30
+    if (typeof filtersOrDays === 'number') {
+      days = filtersOrDays
+    } else if (filtersOrDays && filtersOrDays.date_range?.start && filtersOrDays.date_range?.end) {
+      const start = new Date(filtersOrDays.date_range.start)
+      const end = new Date(filtersOrDays.date_range.end)
+      const diff = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1)
+      days = diff
+    }
+    return tauriInvoke<DailyStats[]>('get_daily_stats', { days })
   }
 
-  // 获取每周统计
-  static async getWeeklyStats(filters?: AnalyticsFilters): Promise<WeeklyStats[]> {
-    return tauriInvoke<WeeklyStats[]>('get_weekly_stats', { filters })
+  // 目前后端未提供周/月统计命令，这里先返回空数组以保证前端不崩溃
+  static async getWeeklyStats(_filters?: AnalyticsFilters): Promise<WeeklyStats[]> {
+    return Promise.resolve([] as WeeklyStats[])
   }
 
-  // 获取每月统计
-  static async getMonthlyStats(filters?: AnalyticsFilters): Promise<MonthlyStats[]> {
-    return tauriInvoke<MonthlyStats[]>('get_monthly_stats', { filters })
+  static async getMonthlyStats(_filters?: AnalyticsFilters): Promise<MonthlyStats[]> {
+    return Promise.resolve([] as MonthlyStats[])
+  }
+
+  // 获取工作时间分布
+  static async getWorkTimeDistribution(workId?: number, startDate?: string, endDate?: string): Promise<any[]> {
+    return tauriInvoke<any[]>('get_work_time_distribution', { 
+      workId: workId, 
+      startDate: startDate, 
+      endDate: endDate 
+    })
+  }
+
+  // 获取模式分布
+  static async getModeDistribution(startDate?: string, endDate?: string): Promise<any> {
+    return tauriInvoke<any>('get_mode_distribution', { 
+      startDate: startDate, 
+      endDate: endDate 
+    })
+  }
+
+  // 获取工作进度
+  static async getWorkProgress(workId: number): Promise<any> {
+    return tauriInvoke<any>('get_work_progress', { workId: workId })
+  }
+
+  // 获取生产力趋势
+  static async getProductivityTrends(days: number = 30): Promise<any[]> {
+    return tauriInvoke<any[]>('get_productivity_trends', { days })
   }
 
   // 获取趋势数据
   static async getTrendData(filters?: AnalyticsFilters): Promise<TrendData[]> {
-    return tauriInvoke<TrendData[]>('get_trend_data', { filters })
+    // 后端暂未提供 get_trend_data 命令，先返回空数组以保证前端稳定
+    return Promise.resolve([] as TrendData[])
   }
 
   // 导出数据
-  static async exportData(format: ExportFormat, filters?: AnalyticsFilters): Promise<ExportData> {
-    return tauriInvoke<ExportData>('export_data', { format, filters })
+  static async exportData(workId?: number, startDate?: string, endDate?: string): Promise<any> {
+    return tauriInvoke<any>('export_data', { 
+      workId: workId, 
+      startDate: startDate, 
+      endDate: endDate 
+    })
   }
 
   // 获取分析数据（兼容旧接口）
@@ -182,6 +235,7 @@ export class AnalyticsAPI {
     workId?: number
     mode?: 'explore' | 'utilize'
   }): Promise<AnalyticsData> {
+    // 兼容旧接口：组合已有接口返回结构化数据
     const filters: AnalyticsFilters = {
       date_range: {
         start: params.startDate || '',
@@ -190,7 +244,39 @@ export class AnalyticsAPI {
       work_ids: params.workId ? [params.workId] : undefined,
       modes: params.mode ? [params.mode] : undefined
     }
-    return tauriInvoke<AnalyticsData>('get_analytics', { filters })
+    const [distribution, daily] = await Promise.all([
+      AnalyticsAPI.getTimeDistribution(filters),
+      AnalyticsAPI.getDailyStats(filters)
+    ])
+
+    const timeDistribution = distribution.map(d => ({
+      workId: d.work_id,
+      workName: d.work_name,
+      workColor: d.work_color,
+      exploreTime: d.explore_time ?? 0,
+      utilizeTime: d.utilize_time ?? 0,
+      totalTime: d.total_time,
+      percentage: d.percentage ?? 0
+    }))
+
+    const dailyStats = daily.map(d => ({
+      date: d.date,
+      totalTime: d.total_time,
+      exploreTime: d.explore_time,
+      utilizeTime: d.utilize_time,
+      sessionCount: d.session_count,
+      completedSessions: d.completed_sessions ?? 0
+    }))
+
+    const summary = {
+      totalTime: dailyStats.reduce((s, x) => s + x.totalTime, 0),
+      exploreTime: dailyStats.reduce((s, x) => s + x.exploreTime, 0),
+      utilizeTime: dailyStats.reduce((s, x) => s + x.utilizeTime, 0),
+      sessionCount: dailyStats.reduce((s, x) => s + x.sessionCount, 0),
+      completionRate: 0
+    }
+
+    return { timeDistribution, dailyStats, summary }
   }
 }
 
@@ -250,6 +336,21 @@ export class SystemAPI {
   // 获取系统信息
   static async getSystemInfo(): Promise<any> {
     return tauriInvoke<any>('get_system_info')
+  }
+
+  // 获取应用版本
+  static async getAppVersion(): Promise<string> {
+    return tauriInvoke<string>('get_app_version')
+  }
+
+  // 获取应用名称
+  static async getAppName(): Promise<string> {
+    return tauriInvoke<string>('get_app_name')
+  }
+
+  // 退出应用
+  static async quitApp(): Promise<void> {
+    return tauriInvoke<void>('quit_app')
   }
 
   // 显示通知

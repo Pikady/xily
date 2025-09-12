@@ -1,10 +1,15 @@
 import { createBrowserRouter } from 'react-router-dom';
-import { TestPage } from '@/pages/TestPage';
+import { Dashboard } from '@/pages/Dashboard';
+import { AppLayout } from '@/components/layout/AppLayout';
 
 const router = createBrowserRouter([
   {
     path: '/',
-    element: <TestPage />
+    element: (
+      <AppLayout>
+        <Dashboard />
+      </AppLayout>
+    )
   }
 ]);
 

@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import { TimerState, TimerConfig, TimerSession, TimerMode } from '@/types/timer'
 import { TimerAPI } from '@/services/api'
 import { immer } from 'zustand/middleware/immer'
+import { useAnalyticsStore } from './analyticsStore'
 
 interface TimerStoreState {
   // 状态
@@ -101,13 +102,11 @@ export const useTimerStore = create<TimerStoreState>()(
           set({ loading: true, error: null })
           
           if (get().currentSession) {
-            const session = await TimerAPI.pauseTimer(get().currentSession!.id)
-            
+            await TimerAPI.pauseTimer(get().currentSession!.id)
             set((draft) => {
               draft.state = 'paused'
               draft.isRunning = false
               draft.pauseTime = Date.now()
-              draft.currentSession = session
               draft.loading = false
             })
           }
@@ -125,18 +124,15 @@ export const useTimerStore = create<TimerStoreState>()(
           set({ loading: true, error: null })
           
           if (get().currentSession) {
-            const session = await TimerAPI.resumeTimer(get().currentSession!.id)
-            
+            await TimerAPI.resumeTimer(get().currentSession!.id)
             const state = get()
             if (state.pauseTime) {
               const pauseDuration = Date.now() - state.pauseTime
-              
               set((draft) => {
                 draft.state = 'running'
                 draft.isRunning = true
                 draft.startTime = (draft.startTime || 0) + pauseDuration
                 draft.pauseTime = null
-                draft.currentSession = session
                 draft.loading = false
               })
             }
@@ -259,6 +255,10 @@ export const useTimerStore = create<TimerStoreState>()(
               draft.isRunning = false
               draft.remainingTime = draft.config.focusDuration * 60
             })
+            
+            // 触发analytics数据更新
+            const analyticsStore = useAnalyticsStore.getState()
+            analyticsStore.fetchData('all')
           }
         } catch (error) {
           set({ 
@@ -271,7 +271,7 @@ export const useTimerStore = create<TimerStoreState>()(
       fetchTimerHistory: async (workId?: number) => {
         try {
           set({ loading: true, error: null })
-          const history = await TimerAPI.getTimerHistory(workId?.toString())
+          const history = await TimerAPI.getTimerHistory(workId)
           
           set((draft) => {
             draft.sessionHistory = history
