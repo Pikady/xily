@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import './styles/globals.css';
+import { initializeStores } from './stores';
 
 console.log('[main.tsx] start');
 
@@ -13,8 +14,19 @@ if (!container) {
 }
 const root = createRoot(container!);
 
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+// 初始化应用Stores
+initializeStores().then(() => {
+  console.log('[main.tsx] Stores initialized');
+  root.render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
+}).catch(error => {
+  console.error('[main.tsx] Failed to initialize stores:', error);
+  root.render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
+});

@@ -242,20 +242,23 @@ export const useTimerStore = create<TimerStoreState>()(
       },
 
       updateConfig: async (config: Partial<TimerConfig>) => {
-        return await errorHandler.withErrorHandling(async () => {
+        try {
           set({ loading: true, error: null })
-          const updatedConfig = await TimerAPI.updateTimerConfig(config)
           
+          // 先更新前端状态，确保UI立即响应
           set((draft) => {
-            draft.config = updatedConfig
+            draft.config = { ...draft.config, ...config }
             draft.loading = false
           })
-        }, {
-          code: ErrorCodes.API_ERROR,
-          message: '更新计时器配置失败',
-          category: ErrorCategory.API,
-          source: 'timerStore.updateConfig'
-        })
+          
+          // 异步通知后端更新配置（不等待完成）
+          TimerAPI.updateTimerConfig(config).catch(error => {
+            console.warn('后端配置更新失败:', error)
+          })
+        } catch (error) {
+          console.error('更新计时器配置时发生错误:', error)
+          set({ loading: false, error: '更新配置失败，请重试' })
+        }
       },
 
       setMode: (mode: TimerMode) => {
@@ -289,14 +292,23 @@ export const useTimerStore = create<TimerStoreState>()(
         try {
           set({ loading: true, error: null })
           const state = get()
-          
+
           if (state.currentSession) {
             const sessionId = state.currentSession.id
-            
+            const workId = state.currentSession?.workId || 0
+            const mode = state.currentSession?.mode || 'explore'
+            const duration = state.currentSession?.duration || state.config.focusDuration
+
             // 前端立即更新状态
             set((draft) => {
               if (state.currentSession) {
-                draft.sessionHistory.push(state.currentSession)
+                // 确保会话标记为已完成
+                const completedSession = {
+                  ...state.currentSession,
+                  isCompleted: true,
+                  actualDuration: duration // 使用实际时长
+                }
+                draft.sessionHistory.push(completedSession)
               }
               draft.currentSession = null
               draft.state = 'idle'
@@ -304,24 +316,27 @@ export const useTimerStore = create<TimerStoreState>()(
               draft.remainingTime = draft.config.focusDuration * 60
               draft.loading = false
             })
-            
-            // 异步保存到后端（不等待完成）
-            TimerAPI.stopTimer(sessionId, state.currentSession?.workId, state.currentSession?.mode, state.currentSession?.duration).catch(error => {
+
+            // 异步保存到后端（等待完成以确保数据正确写入）
+            try {
+              await TimerAPI.stopTimer(sessionId, workId, mode, duration)
+              console.log('Timer session saved to backend successfully')
+            } catch (error) {
               console.warn('后端计时保存失败:', error)
-            })
-            
-            // 触发智能数据同步 - 只更新必要的数据类型
+            }
+
+            // 触发智能数据同步 - 更新所有相关数据类型
             triggerDataSync('timer_completed', {
-              workId: state.currentSession?.workId,
-              mode: state.currentSession?.mode
+              workId: workId,
+              mode: mode
             })
-            
+
             // 发布完成事件
             emit('timer:completed', {
               sessionId: sessionId,
-              workId: state.currentSession?.workId,
-              mode: state.currentSession?.mode,
-              duration: state.currentSession?.duration
+              workId: workId,
+              mode: mode,
+              duration: duration
             }, 'timerStore')
           } else {
             set({ loading: false })
@@ -333,7 +348,7 @@ export const useTimerStore = create<TimerStoreState>()(
       },
 
       fetchTimerHistory: async (workId?: number) => {
-        return await errorHandler.withErrorHandling(async () => {
+        try {
           set({ loading: true, error: null })
           const history = await TimerAPI.getTimerHistory(workId)
           
@@ -341,12 +356,10 @@ export const useTimerStore = create<TimerStoreState>()(
             draft.sessionHistory = history
             draft.loading = false
           })
-        }, {
-          code: ErrorCodes.API_ERROR,
-          message: '获取计时历史失败',
-          category: ErrorCategory.API,
-          source: 'timerStore.fetchTimerHistory'
-        })
+        } catch (error) {
+          console.error('获取计时历史时发生错误:', error)
+          set({ loading: false, error: '获取历史记录失败，请重试' })
+        }
       },
 
       clearHistory: () => {

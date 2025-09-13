@@ -50,8 +50,12 @@ impl TimerService {
     }
 
     pub fn stop_timer(session_id: Option<i64>, work_id: Option<i64>, mode: Option<String>, duration: Option<i32>) -> Result<Option<TimeRecord>> {
-        // 根据前端传来的参数创建时间记录
-        if let (Some(w_id), Some(m), Some(d)) = (work_id, mode, duration) {
+        // 根据前端传来的参数创建时间记录，使用默认值处理None
+        let w_id = work_id.unwrap_or(0);
+        let m = mode.unwrap_or_else(|| "explore".to_string());
+        let d = duration.unwrap_or(25); // 默认25分钟
+        
+        if w_id > 0 || d > 0 { // 只要有work_id或duration就创建记录
             let end_time = Utc::now();
             let start_time = end_time - chrono::Duration::minutes(d as i64);
             

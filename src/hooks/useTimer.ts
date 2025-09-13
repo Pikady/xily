@@ -113,17 +113,45 @@ export const useTimer = () => {
     const todaySessions = sessionHistory
       .filter(session => !!session.startTime)
       .filter(session => new Date(session.startTime as string).toDateString() === today)
-    
+
+    // 计算总时间（优先使用actualDuration，如果没有则使用duration）
+    const totalSessions = todaySessions.length
+    const totalTime = todaySessions.reduce((sum, session) => {
+      const duration = session.actualDuration || session.duration || 0
+      return sum + duration
+    }, 0)
+
+    const exploreTime = todaySessions
+      .filter(session => session.mode === 'explore')
+      .reduce((sum, session) => {
+        const duration = session.actualDuration || session.duration || 0
+        return sum + duration
+      }, 0)
+
+    const utilizeTime = todaySessions
+      .filter(session => session.mode === 'utilize')
+      .reduce((sum, session) => {
+        const duration = session.actualDuration || session.duration || 0
+        return sum + duration
+      }, 0)
+
+    const completedSessions = todaySessions.filter(session => session.isCompleted).length
+
+    console.log('Today stats calculated:', {
+      totalSessions,
+      totalTime,
+      exploreTime,
+      utilizeTime,
+      completedSessions,
+      sessionsCount: todaySessions.length
+    })
+
     return {
-      totalSessions: todaySessions.length,
-      totalTime: todaySessions.reduce((sum, session) => sum + session.actualDuration, 0),
-      exploreTime: todaySessions
-        .filter(session => session.mode === 'explore')
-        .reduce((sum, session) => sum + session.actualDuration, 0),
-      utilizeTime: todaySessions
-        .filter(session => session.mode === 'utilize')
-        .reduce((sum, session) => sum + session.actualDuration, 0),
-      completedSessions: todaySessions.filter(session => session.isCompleted).length
+      totalSessions,
+      totalTime,
+      exploreTime,
+      utilizeTime,
+      completedSessions
     }
   }, [sessionHistory])
 

@@ -54,12 +54,12 @@ export function TimerController({
     }
   }, [isTimerRunning, timerState, timerTick]) // 重新添加 timerTick 依赖，但确保它不会导致循环
 
-  // 处理计时器完成 - 简化逻辑，减少依赖
+  // 处理计时器完成 - 监听状态变化
   useEffect(() => {
     if (timerRemainingTime === 0 && timerState === 'completed' && !isCompletingRef.current) {
       handleTimerComplete()
     }
-  }, [timerRemainingTime]) // 只依赖 remainingTime，减少触发频率
+  }, [timerRemainingTime, timerState]) // 同时监听 remainingTime 和 state 变化
 
   // 处理错误
   useEffect(() => {
@@ -79,6 +79,8 @@ export function TimerController({
       
       // 简化处理，只显示通知和完成会话
       const modeText = timerMode === 'explore' ? '探索' : '利用'
+      
+      // 显示完成提示
       toast.success(`🎉 ${modeText}模式专注完成！`)
       
       // 完成会话 - 添加错误处理

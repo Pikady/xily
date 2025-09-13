@@ -40,6 +40,7 @@ export function TimerDisplay({ className = '', compact = false }: TimerDisplayPr
     stopTimer,
     resetTimer,
     setTimerMode,
+    updateTimerConfig,
     getTodayStats
   } = useTimer()
 
@@ -256,6 +257,25 @@ export function TimerDisplay({ className = '', compact = false }: TimerDisplayPr
                   </>
                 )}
               </Button>
+              
+              {/* 快速测试按钮 - 只在空闲状态显示 */}
+              {timerState === 'idle' && (
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => {
+                    // 临时设置为1分钟进行测试
+                    updateTimerConfig({ focusDuration: 1 }).then(() => {
+                      handleStartPause()
+                    })
+                  }}
+                  disabled={timerLoading}
+                  className="border-green-500 text-green-600 hover:bg-green-50"
+                >
+                  <Clock className="w-5 h-5 mr-2" />
+                  1分钟测试
+                </Button>
+              )}
               
               {(timerState === 'running' || timerState === 'paused') && (
                 <Button size="lg" variant="outline" onClick={handleStop}>

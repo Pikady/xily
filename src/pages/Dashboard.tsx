@@ -6,11 +6,12 @@ import { Play, Plus, BarChart3, Clock, TrendingUp, Target, Calendar, Award } fro
 import { useAnalyticsStore } from '@/stores/analyticsStore';
 import { useWorksStore } from '@/stores/worksStore';
 import { useTimerStore } from '@/stores/timerStore';
-import { 
-  TimeStatsCard, 
-  SessionStatsCard, 
+import { on } from '@/events/EventBus';
+import {
+  TimeStatsCard,
+  SessionStatsCard,
   WorkStatsCard,
-  GoalProgressCard 
+  GoalProgressCard
 } from '@/components/charts/StatCards';
 import { TimeDistributionCharts } from '@/components/charts/TimeDistributionCharts';
 import { TrendAnalysisCharts } from '@/components/charts/TrendAnalysisCharts';
@@ -42,7 +43,7 @@ export function Dashboard() {
     const initializeFilters = () => {
       const today = new Date();
       const thirtyDaysAgo = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 29);
-      
+
       setFilters({
         date_range: {
           start: thirtyDaysAgo.toISOString().split('T')[0],
@@ -60,6 +61,19 @@ export function Dashboard() {
       fetchData('all');
     }
   }, [filters, fetchData]);
+
+  // 监听计时器完成事件，自动刷新数据
+  useEffect(() => {
+    const unsubscribe = on('timer:completed', (event) => {
+      console.log('Dashboard received timer completed event, refreshing data');
+      // 刷新所有相关数据
+      fetchData('all');
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [fetchData]);
 
   
   // 计算统计数据

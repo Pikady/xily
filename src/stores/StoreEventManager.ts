@@ -37,17 +37,36 @@ export class StoreEventManager {
     // 计时器完成 - 更新作品统计和分析数据
     const unsubscribeTimerCompleted = on('timer:completed', (event) => {
       const { workId, mode, duration } = event.payload
-      
+      console.log('Timer completed event received:', { workId, mode, duration })
+
       // 更新相关作品的统计信息
-      if (workId) {
+      if (workId && workId > 0) {
         const worksStore = useWorksStore.getState()
         const currentWork = worksStore.currentWork
-        
+
         // 如果是当前作品，更新其统计
         if (currentWork && currentWork.id === workId) {
+          console.log('Updating current work stats:', workId)
           worksStore.fetchWorkStats(workId)
         }
+
+        // 重新获取作品列表以更新时间
+        console.log('Refreshing works list')
+        worksStore.fetchWorks()
       }
+
+      // 强制刷新分析数据
+      const analyticsStore = useAnalyticsStore.getState()
+      console.log('Refreshing analytics data after timer completion')
+
+      // 立即刷新今日统计数据
+      analyticsStore.fetchData('dailyStats')
+
+      // 刷新时间分布数据
+      analyticsStore.fetchData('timeDistribution')
+
+      // 刷新时间记录数据
+      analyticsStore.fetchData('timeRecords')
     })
 
     this.cleanupFunctions.push(unsubscribeTimerStarted, unsubscribeTimerCompleted)
