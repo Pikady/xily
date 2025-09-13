@@ -3,6 +3,7 @@ import { Work, WorkStats } from '@/types/work'
 import { TimerSession, TimerConfig } from '@/types/timer'
 import { ExportData, TimeRecord, TimeDistribution, DailyStats, WeeklyStats, MonthlyStats, TrendData, AnalyticsFilters, ExportFormat } from '@/types/analytics'
 import { WorkFormData, AnalyticsData } from '@/types/frontend'
+import { errorHandler, ErrorCodes, ErrorCategory } from '@/errors/ErrorHandler'
 
 // API响应基础类型
 export interface ApiResponse<T> {
@@ -27,12 +28,14 @@ const API_CONFIG = {
 
 // Tauri命令调用包装器
 async function tauriInvoke<T>(command: string, args?: any): Promise<T> {
-  try {
+  return await errorHandler.withErrorHandling(async () => {
     return await invoke<T>(command, args)
-  } catch (error) {
-    console.error(`Tauri命令调用失败: ${command}`, error)
-    throw error
-  }
+  }, {
+    code: ErrorCodes.API_ERROR,
+    message: `Tauri命令调用失败: ${command}`,
+    category: ErrorCategory.API,
+    source: 'api.tauriInvoke'
+  })
 }
 
 // 作品相关API
@@ -112,26 +115,38 @@ export class TimerAPI {
     workId?: number
     duration: number
   }): Promise<TimerSession> {
-    return tauriInvoke<TimerSession>('start_timer', { 
-      workId: data.workId,
-      mode: data.mode, 
-      duration: data.duration 
-    })
+    // 确保参数格式正确
+    const work_id = data.workId ? Number(data.workId) : null
+    const mode = String(data.mode)
+    const duration = Number(data.duration)
+    
+    const args = { work_id, mode, duration }
+    console.log('startTimer args:', args)
+    console.log('work_id type:', typeof work_id, 'value:', work_id)
+    console.log('mode type:', typeof mode, 'value:', mode)
+    console.log('duration type:', typeof duration, 'value:', duration)
+    
+    return tauriInvoke<TimerSession>('start_timer', args)
   }
 
   // 暂停计时
   static async pauseTimer(sessionId: number): Promise<boolean> {
-    return tauriInvoke<boolean>('pause_timer')
+    return tauriInvoke<boolean>('pause_timer', { session_id: sessionId })
   }
 
   // 恢复计时
   static async resumeTimer(sessionId: number): Promise<boolean> {
-    return tauriInvoke<boolean>('resume_timer')
+    return tauriInvoke<boolean>('resume_timer', { session_id: sessionId })
   }
 
   // 停止计时
-  static async stopTimer(sessionId: number): Promise<TimeRecord | null> {
-    return tauriInvoke<TimeRecord | null>('stop_timer')
+  static async stopTimer(sessionId: number, workId?: number, mode?: string, duration?: number): Promise<TimeRecord | null> {
+    return tauriInvoke<TimeRecord | null>('stop_timer', { 
+      session_id: sessionId,
+      work_id: workId,
+      mode: mode,
+      duration: duration
+    })
   }
 
   // 获取计时器配置
@@ -146,7 +161,11 @@ export class TimerAPI {
 
   // 获取计时历史
   static async getTimerHistory(workId?: number): Promise<TimerSession[]> {
-    return tauriInvoke<TimerSession[]>('get_timer_sessions', { workId: workId, limit: null })
+    const args = {
+      work_id: workId,
+      limit: null
+    }
+    return tauriInvoke<TimerSession[]>('get_timer_sessions', args)
   }
 }
 

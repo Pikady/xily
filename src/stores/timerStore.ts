@@ -3,7 +3,9 @@ import { persist } from 'zustand/middleware'
 import { TimerState, TimerConfig, TimerSession, TimerMode } from '@/types/timer'
 import { TimerAPI } from '@/services/api'
 import { immer } from 'zustand/middleware/immer'
-import { useAnalyticsStore } from './analyticsStore'
+import { triggerDataSync } from '@/services/DataSyncManager'
+import { emit } from '@/events/EventBus'
+import { errorHandler, ErrorCodes, ErrorCategory } from '@/errors/ErrorHandler'
 
 export interface TimerStoreState {
   // 状态
@@ -62,7 +64,7 @@ export const useTimerStore = create<TimerStoreState>()(
       pauseTime: null,
 
       startTimer: async (mode: TimerMode, workId?: number) => {
-        try {
+        return await errorHandler.withErrorHandling(async () => {
           set({ loading: true, error: null })
           
           const duration = get().config.focusDuration
@@ -72,62 +74,110 @@ export const useTimerStore = create<TimerStoreState>()(
             console.log('未选择作品，将开始无归属的计时')
           }
           
-          const session = await TimerAPI.startTimer({
+          // 仅记录开始计时，不依赖后端返回session
+          const startTime = Date.now()
+          const tempSession: TimerSession = {
+            id: Date.now(), // 临时ID，完成时替换
+            workId: workId || 0,
             mode,
-            workId,
+            duration,
+            actualDuration: 0,
+            remainingTime: duration * 60,
+            isActive: true,
+            isPaused: false,
+            isCompleted: false,
+            startTime: new Date(startTime).toISOString(),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+          
+          // 异步通知后端开始计时（不等待完成）
+          TimerAPI.startTimer({
+            mode,
+            workId: workId || undefined,
             duration
+          }).catch(error => {
+            console.warn('后端计时开始失败，前端继续计时:', error)
           })
+          
+          // 触发智能数据同步 - 只更新分布数据
+          triggerDataSync('timer_started', {
+            workId: workId,
+            mode
+          })
+          
+          // 发布事件给其他Store
+          emit('timer:started', {
+            workId: workId,
+            mode,
+            duration
+          }, 'timerStore')
           
           set((draft) => {
             draft.state = 'running'
             draft.mode = mode
             draft.isRunning = true
-            draft.startTime = Date.now()
+            draft.startTime = startTime
             draft.pauseTime = null
             draft.remainingTime = duration * 60
-            draft.currentSession = session
+            draft.currentSession = tempSession
             draft.loading = false
           })
-        } catch (error) {
-          set({ 
-            error: error instanceof Error ? error.message : 'Failed to start timer',
-            loading: false 
-          })
-          throw error
-        }
+        }, {
+          code: ErrorCodes.INVALID_TIMER_STATE,
+          message: '启动计时器失败',
+          category: ErrorCategory.BUSINESS_LOGIC,
+          source: 'timerStore.startTimer',
+          fallback: async () => {
+            // fallback: 重置计时器状态
+            get().resetTimer()
+            throw new Error('计时器启动失败，已重置状态')
+          }
+        })
       },
 
       pauseTimer: async () => {
-        try {
+        return await errorHandler.withErrorHandling(async () => {
           set({ loading: true, error: null })
           
           if (get().currentSession) {
-            await TimerAPI.pauseTimer(get().currentSession!.id)
+            // 前端立即暂停，异步通知后端
             set((draft) => {
               draft.state = 'paused'
               draft.isRunning = false
               draft.pauseTime = Date.now()
               draft.loading = false
             })
+            
+            // 异步通知后端暂停（不等待完成）
+            TimerAPI.pauseTimer(get().currentSession!.id).catch(error => {
+              console.warn('后端计时暂停失败:', error)
+            })
+            
+            // 发布暂停事件
+            emit('timer:paused', {
+              sessionId: get().currentSession!.id,
+              workId: get().currentSession?.workId
+            }, 'timerStore')
           }
-        } catch (error) {
-          set({ 
-            error: error instanceof Error ? error.message : 'Failed to pause timer',
-            loading: false 
-          })
-          throw error
-        }
+        }, {
+          code: ErrorCodes.INVALID_TIMER_STATE,
+          message: '暂停计时器失败',
+          category: ErrorCategory.BUSINESS_LOGIC,
+          source: 'timerStore.pauseTimer'
+        })
       },
 
       resumeTimer: async () => {
-        try {
+        return await errorHandler.withErrorHandling(async () => {
           set({ loading: true, error: null })
           
           if (get().currentSession) {
-            await TimerAPI.resumeTimer(get().currentSession!.id)
             const state = get()
             if (state.pauseTime) {
               const pauseDuration = Date.now() - state.pauseTime
+              
+              // 前端立即恢复，异步通知后端
               set((draft) => {
                 draft.state = 'running'
                 draft.isRunning = true
@@ -135,19 +185,29 @@ export const useTimerStore = create<TimerStoreState>()(
                 draft.pauseTime = null
                 draft.loading = false
               })
+              
+              // 异步通知后端恢复（不等待完成）
+              TimerAPI.resumeTimer(get().currentSession!.id).catch(error => {
+                console.warn('后端计时恢复失败:', error)
+              })
+              
+              // 发布恢复事件
+              emit('timer:resumed', {
+                sessionId: get().currentSession!.id,
+                workId: get().currentSession?.workId
+              }, 'timerStore')
             }
           }
-        } catch (error) {
-          set({ 
-            error: error instanceof Error ? error.message : 'Failed to resume timer',
-            loading: false 
-          })
-          throw error
-        }
+        }, {
+          code: ErrorCodes.INVALID_TIMER_STATE,
+          message: '恢复计时器失败',
+          category: ErrorCategory.BUSINESS_LOGIC,
+          source: 'timerStore.resumeTimer'
+        })
       },
 
       stopTimer: async () => {
-        try {
+        return await errorHandler.withErrorHandling(async () => {
           set({ loading: true, error: null })
           
           if (get().currentSession) {
@@ -164,13 +224,12 @@ export const useTimerStore = create<TimerStoreState>()(
             draft.currentSession = null
             draft.loading = false
           })
-        } catch (error) {
-          set({ 
-            error: error instanceof Error ? error.message : 'Failed to stop timer',
-            loading: false 
-          })
-          throw error
-        }
+        }, {
+          code: ErrorCodes.INVALID_TIMER_STATE,
+          message: '停止计时器失败',
+          category: ErrorCategory.BUSINESS_LOGIC,
+          source: 'timerStore.stopTimer'
+        })
       },
 
       resetTimer: () => {
@@ -183,11 +242,13 @@ export const useTimerStore = create<TimerStoreState>()(
           draft.pauseTime = null
           draft.remainingTime = duration * 60
           draft.currentSession = null
+          draft.loading = false
+          draft.error = null
         })
       },
 
       updateConfig: async (config: Partial<TimerConfig>) => {
-        try {
+        return await errorHandler.withErrorHandling(async () => {
           set({ loading: true, error: null })
           const updatedConfig = await TimerAPI.updateTimerConfig(config)
           
@@ -195,13 +256,12 @@ export const useTimerStore = create<TimerStoreState>()(
             draft.config = updatedConfig
             draft.loading = false
           })
-        } catch (error) {
-          set({ 
-            error: error instanceof Error ? error.message : 'Failed to update config',
-            loading: false 
-          })
-          throw error
-        }
+        }, {
+          code: ErrorCodes.API_ERROR,
+          message: '更新计时器配置失败',
+          category: ErrorCategory.API,
+          source: 'timerStore.updateConfig'
+        })
       },
 
       setMode: (mode: TimerMode) => {
@@ -214,38 +274,32 @@ export const useTimerStore = create<TimerStoreState>()(
         const state = get()
         if (!state.isRunning || state.state !== 'running') return
 
-        const elapsed = Math.floor((Date.now() - (state.startTime || 0)) / 1000)
-        const newRemainingTime = Math.max(0, (state.config.focusDuration * 60) - elapsed)
+        try {
+          const elapsed = Math.floor((Date.now() - (state.startTime || 0)) / 1000)
+          const newRemainingTime = Math.max(0, (state.config.focusDuration * 60) - elapsed)
 
-        set((draft) => {
-          draft.remainingTime = newRemainingTime
-          
-          if (newRemainingTime === 0 && draft.currentSession) {
-            draft.state = 'completed'
-            draft.isRunning = false
-          }
-        })
-
-        // 自动处理计时器结束 - 使用更可靠的方式
-        if (newRemainingTime === 0) {
-          // 使用 requestAnimationFrame 避免竞态条件
-          requestAnimationFrame(() => {
-            const currentState = get()
-            if (currentState.state === 'completed' && currentState.remainingTime === 0) {
-              get().completeSession().catch(console.error)
+          set((draft) => {
+            draft.remainingTime = newRemainingTime
+            
+            if (newRemainingTime === 0 && draft.currentSession) {
+              draft.state = 'completed'
+              draft.isRunning = false
             }
           })
+        } catch (error) {
+          console.error('Error in timer tick:', error)
         }
       },
 
       completeSession: async () => {
-        try {
+        return await errorHandler.withErrorHandling(async () => {
+          set({ loading: true, error: null })
           const state = get()
           
           if (state.currentSession) {
-            // 停止计时器会话
-            await TimerAPI.stopTimer(state.currentSession.id)
+            const sessionId = state.currentSession.id
             
+            // 前端立即更新状态
             set((draft) => {
               if (state.currentSession) {
                 draft.sessionHistory.push(state.currentSession)
@@ -254,22 +308,40 @@ export const useTimerStore = create<TimerStoreState>()(
               draft.state = 'idle'
               draft.isRunning = false
               draft.remainingTime = draft.config.focusDuration * 60
+              draft.loading = false
             })
             
-            // 触发analytics数据更新
-            const analyticsStore = useAnalyticsStore.getState()
-            analyticsStore.fetchData('all')
+            // 异步保存到后端（不等待完成）
+            TimerAPI.stopTimer(sessionId, state.currentSession?.workId, state.currentSession?.mode, state.currentSession?.duration).catch(error => {
+              console.warn('后端计时保存失败:', error)
+            })
+            
+            // 触发智能数据同步 - 只更新必要的数据类型
+            triggerDataSync('timer_completed', {
+              workId: state.currentSession?.workId,
+              mode: state.currentSession?.mode
+            })
+            
+            // 发布完成事件
+            emit('timer:completed', {
+              sessionId: sessionId,
+              workId: state.currentSession?.workId,
+              mode: state.currentSession?.mode,
+              duration: state.currentSession?.duration
+            }, 'timerStore')
+          } else {
+            set({ loading: false })
           }
-        } catch (error) {
-          set({ 
-            error: error instanceof Error ? error.message : 'Failed to complete session'
-          })
-          throw error
-        }
+        }, {
+          code: ErrorCodes.INVALID_TIMER_STATE,
+          message: '完成计时会话失败',
+          category: ErrorCategory.BUSINESS_LOGIC,
+          source: 'timerStore.completeSession'
+        })
       },
 
       fetchTimerHistory: async (workId?: number) => {
-        try {
+        return await errorHandler.withErrorHandling(async () => {
           set({ loading: true, error: null })
           const history = await TimerAPI.getTimerHistory(workId)
           
@@ -277,13 +349,12 @@ export const useTimerStore = create<TimerStoreState>()(
             draft.sessionHistory = history
             draft.loading = false
           })
-        } catch (error) {
-          set({ 
-            error: error instanceof Error ? error.message : 'Failed to fetch timer history',
-            loading: false 
-          })
-          throw error
-        }
+        }, {
+          code: ErrorCodes.API_ERROR,
+          message: '获取计时历史失败',
+          category: ErrorCategory.API,
+          source: 'timerStore.fetchTimerHistory'
+        })
       },
 
       clearHistory: () => {

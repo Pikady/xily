@@ -51,14 +51,14 @@ export function TimerController({
         clearInterval(intervalRef.current)
       }
     }
-  }, [isTimerRunning, timerState, timerTick])
+  }, [isTimerRunning, timerState]) // 移除 timerTick 依赖，因为它会导致无限循环
 
-  // 处理计时器完成
+  // 处理计时器完成 - 简化逻辑，减少依赖
   useEffect(() => {
-    if (timerRemainingTime === 0 && timerState === 'completed') {
+    if (timerRemainingTime === 0 && timerState === 'completed' && !isCompletingRef.current) {
       handleTimerComplete()
     }
-  }, [timerRemainingTime, timerState])
+  }, [timerRemainingTime]) // 只依赖 remainingTime，减少触发频率
 
   // 处理错误
   useEffect(() => {
@@ -67,40 +67,38 @@ export function TimerController({
     }
   }, [timerError])
 
-  // 处理计时器完成
+  // 处理计时器完成 - 简化版本
   const handleTimerComplete = useCallback(async () => {
     // 防止重复调用
     if (isCompletingRef.current) return
     isCompletingRef.current = true
 
     try {
-      // 显示完成通知
+      console.log('Timer completed, handling completion...')
+      
+      // 简化处理，只显示通知和完成会话
       const modeText = timerMode === 'explore' ? '探索' : '利用'
-      const workText = currentWork ? ` - ${currentWork.name}` : ''
-      toast.success(`🎉 ${modeText}模式专注完成${workText}！`)
+      toast.success(`🎉 ${modeText}模式专注完成！`)
       
-      // 播放完成音效（如果启用）
-      // TODO: 实现音效播放
-      
-      // 发送系统通知（如果启用）
-      // TODO: 实现系统通知
-      
-      // 完成会话
-      await completeSession()
+      // 完成会话 - 添加错误处理
+      try {
+        await completeSession()
+      } catch (sessionError) {
+        console.error('Error completing session:', sessionError)
+      }
       
       // 调用回调
       onTimerComplete?.()
       
-      // 自动开始休息（如果配置启用）
-      // TODO: 实现自动开始休息逻辑
-      
     } catch (error) {
       console.error('Timer completion error:', error)
-      toast.error('完成计时器时发生错误')
     } finally {
-      isCompletingRef.current = false
+      // 延迟重置标志，避免立即重新触发
+      setTimeout(() => {
+        isCompletingRef.current = false
+      }, 1000)
     }
-  }, [timerMode, currentWork, completeSession, onTimerComplete])
+  }, [timerMode, completeSession, onTimerComplete]) // 移除 currentWork 依赖
 
   // 开始计时器
   const handleStart = async (mode: TimerMode, workId?: number) => {
@@ -155,8 +153,13 @@ export function TimerController({
 
   // 重置计时器
   const handleReset = () => {
-    resetTimer()
-    toast.info('计时器已重置')
+    try {
+      resetTimer()
+      toast.info('计时器已重置')
+    } catch (error) {
+      console.error('Reset timer error:', error)
+      toast.error('重置计时器失败')
+    }
   }
 
   // 清理错误状态

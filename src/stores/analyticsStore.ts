@@ -3,6 +3,7 @@ import { immer } from 'zustand/middleware/immer';
 import { persist } from 'zustand/middleware';
 import { AnalyticsFilters, TimeDistribution, DailyStats, WeeklyStats, MonthlyStats, TrendData, ExportData, ExportFormat, TimeRecord } from '@/types/analytics';
 import { analyticsAPI } from '@/services/api';
+import { errorHandler, ErrorCodes, ErrorCategory } from '@/errors/ErrorHandler';
 
 export interface AnalyticsState {
   // 数据状态
@@ -82,7 +83,7 @@ export const useAnalyticsStore = create<AnalyticsState>()(
       
       // 统一的数据获取方法
       fetchData: async (dataType, filters) => {
-        try {
+        return await errorHandler.withErrorHandling(async () => {
           set({ loading: true, error: null });
           const currentFilters = filters || get().filters;
           
@@ -125,15 +126,18 @@ export const useAnalyticsStore = create<AnalyticsState>()(
           }
           
           set({ loading: false });
-        } catch (error) {
-          set({ error: error instanceof Error ? error.message : `获取${dataType}数据失败`, loading: false });
-        }
+        }, {
+          code: ErrorCodes.API_ERROR,
+          message: `获取${dataType}数据失败`,
+          category: ErrorCategory.API,
+          source: 'analyticsStore.fetchData'
+        });
       },
       
       // 数据导出（前端聚合实现，避免与后端参数签名不匹配）
       exportData: async (_format: ExportFormat, _filters) => {
-        set({ loading: true, error: null });
-        try {
+        return await errorHandler.withErrorHandling(async () => {
+          set({ loading: true, error: null });
           const { timeRecords, dailyStats } = get();
           const summary = {
             total_time: dailyStats.reduce((s, d) => s + d.total_time, 0),
@@ -149,10 +153,12 @@ export const useAnalyticsStore = create<AnalyticsState>()(
           const result: ExportData = { time_records: timeRecords as TimeRecord[], summary };
           set({ loading: false });
           return result;
-        } catch (error) {
-          set({ error: error instanceof Error ? error.message : '导出数据失败', loading: false });
-          throw error;
-        }
+        }, {
+          code: ErrorCodes.API_ERROR,
+          message: '导出数据失败',
+          category: ErrorCategory.API,
+          source: 'analyticsStore.exportData'
+        });
       },
       
       // 重置

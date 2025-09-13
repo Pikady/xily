@@ -4,7 +4,9 @@ import { Work, CreateWorkParams, UpdateWorkParams, WorkStats } from '@/types/wor
 import { WorksAPI } from '@/services/api'
 import { WorkFormData } from '@/types/frontend'
 import { immer } from 'zustand/middleware/immer'
-import { useAnalyticsStore } from './analyticsStore'
+import { triggerDataSync } from '@/services/DataSyncManager'
+import { emit, on } from '@/events/EventBus'
+import { errorHandler, ErrorCodes, ErrorCategory } from '@/errors/ErrorHandler'
 
 export interface WorksState {
   works: Work[]
@@ -38,7 +40,7 @@ export const useWorksStore = create<WorksState>()(
       error: null,
 
       addWork: async (workData: WorkFormData) => {
-        try {
+        return await errorHandler.withErrorHandling(async () => {
           set({ loading: true, error: null })
           const newWork = await WorksAPI.createWork(workData)
           
@@ -53,17 +55,24 @@ export const useWorksStore = create<WorksState>()(
             state.loading = false
           })
           
-          // 触发analytics数据更新
-          const analyticsStore = useAnalyticsStore.getState()
-          analyticsStore.fetchData('all')
-        } catch (error) {
-          set({ error: error instanceof Error ? error.message : 'Failed to add work', loading: false })
-          throw error
-        }
+          // 触发智能数据同步
+          triggerDataSync('work_created', { workId: newWork.id })
+          
+          // 发布作品创建事件
+          emit('work:created', {
+            work: newWork,
+            source: 'worksStore'
+          }, 'worksStore')
+        }, {
+          code: ErrorCodes.INVALID_WORK_DATA,
+          message: '创建作品失败',
+          category: ErrorCategory.BUSINESS_LOGIC,
+          source: 'worksStore.addWork'
+        })
       },
 
       updateWork: async (id: number, workData: Partial<WorkFormData>) => {
-        try {
+        return await errorHandler.withErrorHandling(async () => {
           set({ loading: true, error: null })
           const updatedWork = await WorksAPI.updateWork(id.toString(), workData)
           
@@ -81,17 +90,25 @@ export const useWorksStore = create<WorksState>()(
             state.loading = false
           })
           
-          // 触发analytics数据更新
-          const analyticsStore = useAnalyticsStore.getState()
-          analyticsStore.fetchData('all')
-        } catch (error) {
-          set({ error: error instanceof Error ? error.message : 'Failed to update work', loading: false })
-          throw error
-        }
+          // 触发智能数据同步
+          triggerDataSync('work_updated', { workId: id })
+          
+          // 发布作品更新事件
+          emit('work:updated', {
+            workId: id,
+            workData,
+            source: 'worksStore'
+          }, 'worksStore')
+        }, {
+          code: ErrorCodes.INVALID_WORK_DATA,
+          message: '更新作品失败',
+          category: ErrorCategory.BUSINESS_LOGIC,
+          source: 'worksStore.updateWork'
+        })
       },
 
       deleteWork: async (id: number) => {
-        try {
+        return await errorHandler.withErrorHandling(async () => {
           set({ loading: true, error: null })
           await WorksAPI.deleteWork(id.toString())
           
@@ -106,17 +123,24 @@ export const useWorksStore = create<WorksState>()(
             state.loading = false
           })
           
-          // 触发analytics数据更新
-          const analyticsStore = useAnalyticsStore.getState()
-          analyticsStore.fetchData('all')
-        } catch (error) {
-          set({ error: error instanceof Error ? error.message : 'Failed to delete work', loading: false })
-          throw error
-        }
+          // 触发智能数据同步
+          triggerDataSync('work_deleted', { workId: id })
+          
+          // 发布作品删除事件
+          emit('work:deleted', {
+            workId: id,
+            source: 'worksStore'
+          }, 'worksStore')
+        }, {
+          code: ErrorCodes.WORK_NOT_FOUND,
+          message: '删除作品失败',
+          category: ErrorCategory.BUSINESS_LOGIC,
+          source: 'worksStore.deleteWork'
+        })
       },
 
       archiveWork: async (id: number) => {
-        try {
+        return await errorHandler.withErrorHandling(async () => {
           set({ loading: true, error: null })
           await WorksAPI.archiveWork(id.toString())
           
@@ -130,14 +154,16 @@ export const useWorksStore = create<WorksState>()(
             }
             state.loading = false
           })
-        } catch (error) {
-          set({ error: error instanceof Error ? error.message : 'Failed to archive work', loading: false })
-          throw error
-        }
+        }, {
+          code: ErrorCodes.WORK_NOT_FOUND,
+          message: '归档作品失败',
+          category: ErrorCategory.BUSINESS_LOGIC,
+          source: 'worksStore.archiveWork'
+        })
       },
 
       unarchiveWork: async (id: number) => {
-        try {
+        return await errorHandler.withErrorHandling(async () => {
           set({ loading: true, error: null })
           await WorksAPI.unarchiveWork(id.toString())
           
@@ -151,20 +177,35 @@ export const useWorksStore = create<WorksState>()(
             }
             state.loading = false
           })
-        } catch (error) {
-          set({ error: error instanceof Error ? error.message : 'Failed to unarchive work', loading: false })
-          throw error
-        }
+        }, {
+          code: ErrorCodes.WORK_NOT_FOUND,
+          message: '取消归档作品失败',
+          category: ErrorCategory.BUSINESS_LOGIC,
+          source: 'worksStore.unarchiveWork'
+        })
       },
 
       setCurrentWork: (work: Work | null) => {
         set((state) => {
+          const previousWork = state.currentWork
           state.currentWork = work
+          
+          // 如果作品发生变化，发布选择事件
+          if (previousWork?.id !== work?.id) {
+            // 在set之外发布事件以避免状态更新问题
+            setTimeout(() => {
+              emit('work:selected', {
+                work,
+                previousWork,
+                source: 'worksStore'
+              }, 'worksStore')
+            }, 0)
+          }
         })
       },
 
       fetchWorks: async () => {
-        try {
+        return await errorHandler.withErrorHandling(async () => {
           set({ loading: true, error: null })
           const works = await WorksAPI.getAllWorks()
           
@@ -173,14 +214,16 @@ export const useWorksStore = create<WorksState>()(
             state.works = Array.isArray(works) ? works.filter(work => work !== null && work !== undefined) : []
             state.loading = false
           })
-        } catch (error) {
-          set({ error: error instanceof Error ? error.message : 'Failed to fetch works', loading: false })
-          throw error
-        }
+        }, {
+          code: ErrorCodes.API_ERROR,
+          message: '获取作品列表失败',
+          category: ErrorCategory.API,
+          source: 'worksStore.fetchWorks'
+        })
       },
 
       fetchWorkStats: async (workId: number) => {
-        try {
+        return await errorHandler.withErrorHandling(async () => {
           set({ loading: true, error: null })
           const stats = await WorksAPI.getWorkStats(workId.toString())
           
@@ -188,22 +231,26 @@ export const useWorksStore = create<WorksState>()(
             state.stats = stats
             state.loading = false
           })
-        } catch (error) {
-          set({ error: error instanceof Error ? error.message : 'Failed to fetch work stats', loading: false })
-          throw error
-        }
+        }, {
+          code: ErrorCodes.API_ERROR,
+          message: '获取作品统计失败',
+          category: ErrorCategory.API,
+          source: 'worksStore.fetchWorkStats'
+        })
       },
 
       fetchAllWorksStats: async () => {
-        try {
+        return await errorHandler.withErrorHandling(async () => {
           set({ loading: true, error: null })
           const stats = await WorksAPI.getAllWorksStats()
           set({ loading: false })
           return stats
-        } catch (error) {
-          set({ error: error instanceof Error ? error.message : 'Failed to fetch works stats', loading: false })
-          throw error
-        }
+        }, {
+          code: ErrorCodes.API_ERROR,
+          message: '获取所有作品统计失败',
+          category: ErrorCategory.API,
+          source: 'worksStore.fetchAllWorksStats'
+        })
       },
 
       clearWorks: () => {

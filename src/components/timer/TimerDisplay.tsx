@@ -264,8 +264,12 @@ export function TimerDisplay({ className = '', compact = false }: TimerDisplayPr
                 </Button>
               )}
               
-              <Button size="lg" variant="ghost" onClick={handleReset}>
-                <RotateCcw className="w-5 h-5" />
+              <Button size="lg" variant="ghost" onClick={handleReset} disabled={timerLoading}>
+                {timerLoading ? (
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-current" />
+                ) : (
+                  <RotateCcw className="w-5 h-5" />
+                )}
               </Button>
             </div>
           </div>

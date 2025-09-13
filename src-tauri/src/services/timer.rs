@@ -1,11 +1,7 @@
 use crate::models::{TimerSession, TimeRecord, TimerConfig};
 use crate::database::get_connection;
 use rusqlite::{Result, params};
-use chrono::{Utc, Duration};
-use std::sync::Mutex;
-use once_cell::sync::Lazy;
-
-static CURRENT_SESSION: Lazy<Mutex<Option<TimerSession>>> = Lazy::new(|| Mutex::new(None));
+use chrono::Utc;
 
 pub struct TimerService;
 
@@ -21,9 +17,6 @@ impl TimerService {
             is_active: true,
             duration,
         };
-        
-        // 保存当前会话到内存
-        *CURRENT_SESSION.lock().unwrap() = Some(session.clone());
         
         // 记录到数据库
         let conn = get_connection()?;
@@ -56,25 +49,40 @@ impl TimerService {
         Ok(session)
     }
 
-    pub fn stop_timer() -> Result<Option<TimeRecord>> {
-        let mut current_session = CURRENT_SESSION.lock().unwrap();
-        if let Some(session) = current_session.take() {
+    pub fn stop_timer(session_id: Option<i64>, work_id: Option<i64>, mode: Option<String>, duration: Option<i32>) -> Result<Option<TimeRecord>> {
+        // 根据前端传来的参数创建时间记录
+        if let (Some(w_id), Some(m), Some(d)) = (work_id, mode, duration) {
             let end_time = Utc::now();
-            let actual_duration = (end_time - session.start_time).num_minutes() as i32;
+            let start_time = end_time - chrono::Duration::minutes(d as i64);
             
             let record = TimeRecord {
                 id: None,
-                work_id: Some(session.work_id),
-                mode: session.mode,
-                duration: actual_duration,
-                start_time: session.start_time,
+                work_id: Some(w_id),
+                mode: m,
+                duration: d,
+                start_time,
                 end_time,
-                is_completed: actual_duration >= session.duration,
+                is_completed: true,
                 notes: None,
             };
             
             // 保存时间记录
             let conn = get_connection()?;
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS time_records (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    work_id INTEGER,
+                    mode TEXT NOT NULL,
+                    duration INTEGER NOT NULL,
+                    start_time DATETIME NOT NULL,
+                    end_time DATETIME NOT NULL,
+                    is_completed BOOLEAN DEFAULT FALSE,
+                    notes TEXT,
+                    FOREIGN KEY (work_id) REFERENCES works(id)
+                )",
+                [],
+            )?;
+            
             conn.execute(
                 "INSERT INTO time_records (work_id, mode, duration, start_time, end_time, is_completed) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
                 params![
@@ -87,11 +95,13 @@ impl TimerService {
                 ],
             )?;
             
-            // 更新计时器会话状态
-            conn.execute(
-                "UPDATE timer_sessions SET is_active = FALSE WHERE work_id = ?1 AND start_time = ?2",
-                params![session.work_id, session.start_time],
-            )?;
+            // 如果提供了session_id，更新对应session状态
+            if let Some(sid) = session_id {
+                conn.execute(
+                    "UPDATE timer_sessions SET is_active = FALSE WHERE id = ?1",
+                    params![sid],
+                )?;
+            }
             
             Ok(Some(record))
         } else {
@@ -99,9 +109,7 @@ impl TimerService {
         }
     }
 
-    pub fn get_current_session() -> Result<Option<TimerSession>> {
-        Ok(CURRENT_SESSION.lock().unwrap().clone())
-    }
+    // 移除get_current_session方法，由前端管理状态
 
     pub fn get_timer_config() -> Result<TimerConfig> {
         let conn = get_connection()?;
@@ -129,37 +137,29 @@ impl TimerService {
         Ok(())
     }
 
-    pub fn pause_timer() -> Result<bool> {
-        let mut current_session = CURRENT_SESSION.lock().unwrap();
-        if let Some(session) = current_session.as_mut() {
-            session.is_active = false;
-            
-            // 更新数据库中的状态
+    // 简化pause_timer方法，仅更新数据库状态
+    pub fn pause_timer(session_id: Option<i64>) -> Result<bool> {
+        if let Some(sid) = session_id {
             let conn = get_connection()?;
-            conn.execute(
-                "UPDATE timer_sessions SET is_active = FALSE WHERE work_id = ?1 AND start_time = ?2",
-                params![session.work_id, session.start_time],
+            let rows_affected = conn.execute(
+                "UPDATE timer_sessions SET is_active = FALSE WHERE id = ?1",
+                params![sid],
             )?;
-            
-            Ok(true)
+            Ok(rows_affected > 0)
         } else {
             Ok(false)
         }
     }
 
-    pub fn resume_timer() -> Result<bool> {
-        let mut current_session = CURRENT_SESSION.lock().unwrap();
-        if let Some(session) = current_session.as_mut() {
-            session.is_active = true;
-            
-            // 更新数据库中的状态
+    // 简化resume_timer方法，仅更新数据库状态
+    pub fn resume_timer(session_id: Option<i64>) -> Result<bool> {
+        if let Some(sid) = session_id {
             let conn = get_connection()?;
-            conn.execute(
-                "UPDATE timer_sessions SET is_active = TRUE WHERE work_id = ?1 AND start_time = ?2",
-                params![session.work_id, session.start_time],
+            let rows_affected = conn.execute(
+                "UPDATE timer_sessions SET is_active = TRUE WHERE id = ?1",
+                params![sid],
             )?;
-            
-            Ok(true)
+            Ok(rows_affected > 0)
         } else {
             Ok(false)
         }

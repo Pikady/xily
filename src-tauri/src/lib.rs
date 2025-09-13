@@ -50,7 +50,6 @@ pub fn run() {
             stop_timer,
             pause_timer,
             resume_timer,
-            get_current_session,
             get_timer_config,
             save_timer_config,
             get_timer_sessions,

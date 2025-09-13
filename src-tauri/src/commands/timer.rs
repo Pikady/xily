@@ -1,15 +1,8 @@
 // 计时器命令实现
-use tauri::Manager;
 use crate::services::timer::TimerService;
 use crate::models::{TimerSession, TimerConfig, TimeRecord};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct StartTimerArgs {
-    pub work_id: Option<i64>,
-    pub mode: String,
-    pub duration: i32,
-}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GetTimerSessionsArgs {
@@ -18,34 +11,29 @@ pub struct GetTimerSessionsArgs {
 }
 
 #[tauri::command]
-pub async fn start_timer(args: StartTimerArgs) -> Result<TimerSession, String> {
-    TimerService::start_timer(args.work_id, args.mode, args.duration)
+pub async fn start_timer(work_id: Option<i64>, mode: String, duration: i32) -> Result<TimerSession, String> {
+    TimerService::start_timer(work_id, mode, duration)
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn pause_timer() -> Result<bool, String> {
-    TimerService::pause_timer()
+pub async fn pause_timer(session_id: Option<i64>) -> Result<bool, String> {
+    TimerService::pause_timer(session_id)
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn resume_timer() -> Result<bool, String> {
-    TimerService::resume_timer()
+pub async fn resume_timer(session_id: Option<i64>) -> Result<bool, String> {
+    TimerService::resume_timer(session_id)
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn stop_timer() -> Result<Option<TimeRecord>, String> {
-    TimerService::stop_timer()
+pub async fn stop_timer(session_id: Option<i64>, work_id: Option<i64>, mode: Option<String>, duration: Option<i32>) -> Result<Option<TimeRecord>, String> {
+    TimerService::stop_timer(session_id, work_id, mode, duration)
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-pub async fn get_current_session() -> Result<Option<TimerSession>, String> {
-    TimerService::get_current_session()
-        .map_err(|e| e.to_string())
-}
 
 #[tauri::command]
 pub async fn get_timer_config() -> Result<TimerConfig, String> {

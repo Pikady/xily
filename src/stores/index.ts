@@ -6,6 +6,9 @@ export { useAppStore } from './appStore'
 export { useAnalyticsStore } from './analyticsStore'
 export { useTrayStore } from './trayStore'
 
+// 导出事件管理器
+export { storeEventManager } from './StoreEventManager'
+
 // 导出Store类型
 export type { WorksState } from './worksStore'
 export type { TimerStoreState } from './timerStore'
@@ -23,9 +26,13 @@ export const initializeStores = async () => {
   const { useUIStore } = await import('./uiStore')
   const { useAnalyticsStore } = await import('./analyticsStore')
   const { useTrayStore } = await import('./trayStore')
+  const { storeEventManager } = await import('./StoreEventManager')
   
   // 初始化应用状态
   await useAppStore.getState().initializeApp()
+  
+  // 初始化事件系统
+  storeEventManager.initialize()
   
   // 初始化作品数据
   await useWorksStore.getState().fetchWorks()

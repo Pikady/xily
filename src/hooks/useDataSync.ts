@@ -1,5 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useAnalyticsStore } from '@/stores/analyticsStore';
+import { dataSyncManager } from '@/services/DataSyncManager';
+import type { DataUpdateType } from '@/events/DataSyncEvents';
 
 interface UseDataSyncOptions {
   interval?: number; // 自动更新间隔（毫秒）
@@ -118,6 +120,77 @@ export function useDataSync(options: UseDataSyncOptions = {}) {
     error,
     lastSyncTime: lastSyncTimeRef.current,
     isAutoUpdateEnabled: enabled
+  };
+}
+
+// 智能数据同步Hook - 使用DataSyncManager
+export function useSmartDataSync(options: {
+  enabled?: boolean;
+  interval?: number;
+  autoRefreshTypes?: DataUpdateType[];
+} = {}) {
+  const { 
+    enabled = true, 
+    interval = 30000,
+    autoRefreshTypes = ['dailyStats', 'timeDistribution'] as DataUpdateType[]
+  } = options;
+
+  const intervalRef = useRef<NodeJS.Timeout>();
+  const [syncStatus, setSyncStatus] = useState(() => dataSyncManager.getSyncStatus());
+
+  // 更新同步状态
+  const updateSyncStatus = useCallback(() => {
+    setSyncStatus(dataSyncManager.getSyncStatus());
+  }, []);
+
+  // 智能刷新函数
+  const smartRefresh = useCallback(async (types?: DataUpdateType[]) => {
+    const targetTypes = types || autoRefreshTypes;
+    try {
+      await dataSyncManager.refreshDataTypes(targetTypes);
+      updateSyncStatus();
+    } catch (error) {
+      console.error('Smart refresh failed:', error);
+    }
+  }, [autoRefreshTypes, updateSyncStatus]);
+
+  // 自动刷新逻辑
+  useEffect(() => {
+    if (!enabled) {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = undefined;
+      }
+      return;
+    }
+
+    // 设置定时器
+    intervalRef.current = setInterval(() => {
+      smartRefresh();
+    }, interval);
+
+    // 立即执行一次
+    smartRefresh();
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [enabled, interval, smartRefresh]);
+
+  // 定期更新状态
+  useEffect(() => {
+    const statusInterval = setInterval(updateSyncStatus, 1000);
+    return () => clearInterval(statusInterval);
+  }, [updateSyncStatus]);
+
+  return {
+    refresh: smartRefresh,
+    syncStatus,
+    isProcessing: syncStatus.isProcessing,
+    queueLength: syncStatus.queueLength,
+    lastUpdateTime: syncStatus.lastUpdateTime
   };
 }
 
