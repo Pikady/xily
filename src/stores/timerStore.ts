@@ -64,7 +64,7 @@ export const useTimerStore = create<TimerStoreState>()(
       pauseTime: null,
 
       startTimer: async (mode: TimerMode, workId?: number) => {
-        return await errorHandler.withErrorHandling(async () => {
+        try {
           set({ loading: true, error: null })
           
           const duration = get().config.focusDuration
@@ -91,13 +91,26 @@ export const useTimerStore = create<TimerStoreState>()(
             updated_at: new Date().toISOString()
           }
           
-          // 异步通知后端开始计时（不等待完成）
+          // 先更新前端状态，确保用户界面立即响应
+          set((draft) => {
+            draft.state = 'running'
+            draft.mode = mode
+            draft.isRunning = true
+            draft.startTime = startTime
+            draft.pauseTime = null
+            draft.remainingTime = duration * 60
+            draft.currentSession = tempSession
+            draft.loading = false
+          })
+          
+          // 异步通知后端开始计时（不等待完成，不阻塞前端）
           TimerAPI.startTimer({
             mode,
             workId: workId || undefined,
             duration
           }).catch(error => {
             console.warn('后端计时开始失败，前端继续计时:', error)
+            // 后端失败不影响前端计时，只记录警告
           })
           
           // 触发智能数据同步 - 只更新分布数据
@@ -113,31 +126,15 @@ export const useTimerStore = create<TimerStoreState>()(
             duration
           }, 'timerStore')
           
-          set((draft) => {
-            draft.state = 'running'
-            draft.mode = mode
-            draft.isRunning = true
-            draft.startTime = startTime
-            draft.pauseTime = null
-            draft.remainingTime = duration * 60
-            draft.currentSession = tempSession
-            draft.loading = false
-          })
-        }, {
-          code: ErrorCodes.INVALID_TIMER_STATE,
-          message: '启动计时器失败',
-          category: ErrorCategory.BUSINESS_LOGIC,
-          source: 'timerStore.startTimer',
-          fallback: async () => {
-            // fallback: 重置计时器状态
-            get().resetTimer()
-            throw new Error('计时器启动失败，已重置状态')
-          }
-        })
+        } catch (error) {
+          console.error('启动计时器时发生错误:', error)
+          set({ loading: false, error: '启动计时器失败，请重试' })
+          // 不重置整个计时器状态，只显示错误信息
+        }
       },
 
       pauseTimer: async () => {
-        return await errorHandler.withErrorHandling(async () => {
+        try {
           set({ loading: true, error: null })
           
           if (get().currentSession) {
@@ -160,16 +157,14 @@ export const useTimerStore = create<TimerStoreState>()(
               workId: get().currentSession?.workId
             }, 'timerStore')
           }
-        }, {
-          code: ErrorCodes.INVALID_TIMER_STATE,
-          message: '暂停计时器失败',
-          category: ErrorCategory.BUSINESS_LOGIC,
-          source: 'timerStore.pauseTimer'
-        })
+        } catch (error) {
+          console.error('暂停计时器时发生错误:', error)
+          set({ loading: false, error: '暂停计时器失败，请重试' })
+        }
       },
 
       resumeTimer: async () => {
-        return await errorHandler.withErrorHandling(async () => {
+        try {
           set({ loading: true, error: null })
           
           if (get().currentSession) {
@@ -198,20 +193,21 @@ export const useTimerStore = create<TimerStoreState>()(
               }, 'timerStore')
             }
           }
-        }, {
-          code: ErrorCodes.INVALID_TIMER_STATE,
-          message: '恢复计时器失败',
-          category: ErrorCategory.BUSINESS_LOGIC,
-          source: 'timerStore.resumeTimer'
-        })
+        } catch (error) {
+          console.error('恢复计时器时发生错误:', error)
+          set({ loading: false, error: '恢复计时器失败，请重试' })
+        }
       },
 
       stopTimer: async () => {
-        return await errorHandler.withErrorHandling(async () => {
+        try {
           set({ loading: true, error: null })
           
           if (get().currentSession) {
-            await TimerAPI.stopTimer(get().currentSession!.id)
+            // 异步通知后端停止（不等待完成）
+            TimerAPI.stopTimer(get().currentSession!.id).catch(error => {
+              console.warn('后端计时停止失败:', error)
+            })
             await get().completeSession()
           }
           
@@ -224,12 +220,10 @@ export const useTimerStore = create<TimerStoreState>()(
             draft.currentSession = null
             draft.loading = false
           })
-        }, {
-          code: ErrorCodes.INVALID_TIMER_STATE,
-          message: '停止计时器失败',
-          category: ErrorCategory.BUSINESS_LOGIC,
-          source: 'timerStore.stopTimer'
-        })
+        } catch (error) {
+          console.error('停止计时器时发生错误:', error)
+          set({ loading: false, error: '停止计时器失败，请重试' })
+        }
       },
 
       resetTimer: () => {
@@ -292,7 +286,7 @@ export const useTimerStore = create<TimerStoreState>()(
       },
 
       completeSession: async () => {
-        return await errorHandler.withErrorHandling(async () => {
+        try {
           set({ loading: true, error: null })
           const state = get()
           
@@ -332,12 +326,10 @@ export const useTimerStore = create<TimerStoreState>()(
           } else {
             set({ loading: false })
           }
-        }, {
-          code: ErrorCodes.INVALID_TIMER_STATE,
-          message: '完成计时会话失败',
-          category: ErrorCategory.BUSINESS_LOGIC,
-          source: 'timerStore.completeSession'
-        })
+        } catch (error) {
+          console.error('完成计时会话时发生错误:', error)
+          set({ loading: false, error: '完成计时会话失败，请重试' })
+        }
       },
 
       fetchTimerHistory: async (workId?: number) => {

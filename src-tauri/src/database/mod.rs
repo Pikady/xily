@@ -1,11 +1,25 @@
 use rusqlite::{Connection, Result, types::Type};
 use std::sync::Mutex;
 use once_cell::sync::Lazy;
+use std::path::PathBuf;
 
 static DB_CONN: Lazy<Mutex<Option<Connection>>> = Lazy::new(|| Mutex::new(None));
+static DB_PATH: Lazy<Mutex<Option<PathBuf>>> = Lazy::new(|| Mutex::new(None));
 
 pub fn init_database() -> Result<()> {
-    let conn = Connection::open("xily.db")?;
+    // 获取用户数据目录
+    let app_data_dir = dirs::data_dir()
+        .unwrap_or_else(|| std::env::current_dir().unwrap())
+        .join("xily");
+    
+    // 确保目录存在
+    std::fs::create_dir_all(&app_data_dir)
+        .map_err(|e| rusqlite::Error::InvalidColumnType(0, format!("Failed to create directory: {}", e), Type::Null))?;
+    
+    let db_path = app_data_dir.join("xily.db");
+    *DB_PATH.lock().unwrap() = Some(db_path.clone());
+    
+    let conn = Connection::open(&db_path)?;
     
     // 创建表
     conn.execute_batch(
@@ -57,4 +71,9 @@ pub fn get_connection() -> Result<Connection> {
     let guard = DB_CONN.lock().unwrap();
     guard.as_ref()
         .ok_or_else(|| rusqlite::Error::InvalidColumnType(0, "Database not initialized".into(), Type::Null))?;
-    Ok(Connection::open("xily.db")?)}
+    let path_guard = DB_PATH.lock().unwrap();
+    let db_path = path_guard.as_ref()
+        .ok_or_else(|| rusqlite::Error::InvalidColumnType(0, "Database path not set".into(), Type::Null))?;
+    
+    Ok(Connection::open(db_path)?)
+}

@@ -1,0 +1,8 @@
+# 排除数据库文件，避免开发模式下的自动重建
+src-tauri/xily.db
+src-tauri/*.db
+*.db
+
+# 排除其他可能频繁变化的文件
+src-tauri/target/
+src-tauri/Cargo.lock

@@ -49,9 +49,10 @@ export function TimerController({
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
+        intervalRef.current = null
       }
     }
-  }, [isTimerRunning, timerState]) // 移除 timerTick 依赖，因为它会导致无限循环
+  }, [isTimerRunning, timerState, timerTick]) // 重新添加 timerTick 依赖，但确保它不会导致循环
 
   // 处理计时器完成 - 简化逻辑，减少依赖
   useEffect(() => {
