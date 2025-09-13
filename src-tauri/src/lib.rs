@@ -59,6 +59,7 @@ pub fn run() {
             get_mode_distribution,
             get_daily_stats,
             get_work_progress,
+            get_work_stats,
             get_productivity_trends,
             export_data,
             

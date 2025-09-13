@@ -9,33 +9,36 @@ impl AnalyticsService {
     pub fn get_work_time_distribution(work_id: Option<i64>, start_date: Option<DateTime<Utc>>, end_date: Option<DateTime<Utc>>) -> Result<Vec<WorkTimeStats>> {
         let conn = get_connection()?;
         let mut query = "
-            SELECT w.id, w.name, w.color, SUM(tr.duration) as total_time, 
-                   COUNT(tr.id) as session_count, 
-                   AVG(tr.duration) as avg_duration
+            SELECT w.id, w.name, w.color, COALESCE(SUM(tr.duration), 0) as total_time,
+                   COALESCE(COUNT(tr.id), 0) as session_count,
+                   COALESCE(AVG(tr.duration), 0) as avg_duration
             FROM works w
             LEFT JOIN time_records tr ON w.id = tr.work_id
             WHERE 1=1
         ".to_string();
-        
+
         let mut params_vec = Vec::new();
-        
+
         if let Some(id) = work_id {
             query.push_str(" AND w.id = ?1");
             params_vec.push(id.to_string());
         }
-        
+
         if let Some(start) = start_date {
             query.push_str(" AND tr.start_time >= ?");
             params_vec.push(start.to_rfc3339());
         }
-        
+
         if let Some(end) = end_date {
             query.push_str(" AND tr.end_time <= ?");
             params_vec.push(end.to_rfc3339());
         }
-        
+
         query.push_str(" GROUP BY w.id, w.name, w.color ORDER BY total_time DESC");
-        
+
+        println!("🔍 Query: {}", query);
+        println!("🔍 Params: {:?}", params_vec);
+
         let mut stmt = conn.prepare(&query)?;
         let rows = stmt.query_map(rusqlite::params_from_iter(params_vec), |row| {
             Ok(WorkTimeStats {
@@ -47,10 +50,12 @@ impl AnalyticsService {
                 avg_duration: row.get(5)?,
             })
         })?;
-        
+
         let mut stats = Vec::new();
         for stat in rows {
-            stats.push(stat?);
+            let stat = stat?;
+            println!("🔍 Work stat: {} - {} minutes, {} sessions", stat.work_name, stat.total_time, stat.session_count);
+            stats.push(stat);
         }
         Ok(stats)
     }
@@ -148,8 +153,8 @@ impl AnalyticsService {
 
     pub fn get_work_progress(work_id: i64) -> Result<WorkProgress> {
         let conn = get_connection()?;
-        let mut stmt = conn.prepare(
-            "SELECT 
+        let query = "
+            SELECT
                 w.target_hours,
                 COALESCE(SUM(tr.duration), 0) as total_minutes,
                 COALESCE(COUNT(tr.id), 0) as session_count,
@@ -157,23 +162,28 @@ impl AnalyticsService {
              FROM works w
              LEFT JOIN time_records tr ON w.id = tr.work_id
              WHERE w.id = ?1
-             GROUP BY w.id, w.target_hours"
-        )?;
-        
+             GROUP BY w.id, w.target_hours";
+
+        println!("📊 get_work_progress query for work_id {}: {}", work_id, query);
+
+        let mut stmt = conn.prepare(query)?;
         let mut rows = stmt.query(params![work_id])?;
-        
+
         if let Some(row) = rows.next()? {
             let target_hours: i32 = row.get(0)?;
             let total_minutes: i32 = row.get(1)?;
             let session_count: i32 = row.get(2)?;
             let avg_duration: f64 = row.get(3)?;
-            
+
             let progress_percentage = if target_hours > 0 {
                 (total_minutes as f64 / (target_hours * 60) as f64) * 100.0
             } else {
                 0.0
             };
-            
+
+            println!("📊 Work {} progress: {}m / {}h = {:.1}%, {} sessions",
+                     work_id, total_minutes, target_hours, progress_percentage, session_count);
+
             Ok(WorkProgress {
                 work_id,
                 target_hours,
@@ -183,6 +193,7 @@ impl AnalyticsService {
                 progress_percentage,
             })
         } else {
+            println!("📊 No work found for work_id {}, returning empty progress", work_id);
             Ok(WorkProgress {
                 work_id,
                 target_hours: 0,

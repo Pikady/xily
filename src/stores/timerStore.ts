@@ -292,23 +292,14 @@ export const useTimerStore = create<TimerStoreState>()(
         try {
           set({ loading: true, error: null })
           const state = get()
-
+          
           if (state.currentSession) {
             const sessionId = state.currentSession.id
-            const workId = state.currentSession?.workId || 0
-            const mode = state.currentSession?.mode || 'explore'
-            const duration = state.currentSession?.duration || state.config.focusDuration
-
+            
             // 前端立即更新状态
             set((draft) => {
               if (state.currentSession) {
-                // 确保会话标记为已完成
-                const completedSession = {
-                  ...state.currentSession,
-                  isCompleted: true,
-                  actualDuration: duration // 使用实际时长
-                }
-                draft.sessionHistory.push(completedSession)
+                draft.sessionHistory.push(state.currentSession)
               }
               draft.currentSession = null
               draft.state = 'idle'
@@ -316,27 +307,29 @@ export const useTimerStore = create<TimerStoreState>()(
               draft.remainingTime = draft.config.focusDuration * 60
               draft.loading = false
             })
-
-            // 异步保存到后端（等待完成以确保数据正确写入）
-            try {
-              await TimerAPI.stopTimer(sessionId, workId, mode, duration)
-              console.log('Timer session saved to backend successfully')
-            } catch (error) {
+            
+            // 异步保存到后端（不等待完成）
+            TimerAPI.stopTimer(
+              sessionId, 
+              state.currentSession?.workId || 0, 
+              state.currentSession?.mode || 'explore', 
+              state.currentSession?.duration || state.config.focusDuration
+            ).catch(error => {
               console.warn('后端计时保存失败:', error)
-            }
-
-            // 触发智能数据同步 - 更新所有相关数据类型
-            triggerDataSync('timer_completed', {
-              workId: workId,
-              mode: mode
             })
-
+            
+            // 触发智能数据同步 - 只更新必要的数据类型
+            triggerDataSync('timer_completed', {
+              workId: state.currentSession?.workId,
+              mode: state.currentSession?.mode
+            })
+            
             // 发布完成事件
             emit('timer:completed', {
               sessionId: sessionId,
-              workId: workId,
-              mode: mode,
-              duration: duration
+              workId: state.currentSession?.workId,
+              mode: state.currentSession?.mode,
+              duration: state.currentSession?.duration
             }, 'timerStore')
           } else {
             set({ loading: false })

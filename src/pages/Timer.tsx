@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { TimerDisplay } from '@/components/timer/TimerDisplay'
 import { TimerController } from '@/components/timer/TimerController'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -6,10 +6,9 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useWorks } from '@/hooks/useWorks'
 import { useTimer } from '@/hooks/useTimer'
-import { on } from '@/events/EventBus'
-import {
-  Clock,
-  Settings,
+import { 
+  Clock, 
+  Settings, 
   Target,
   BookOpen,
   Zap,
@@ -17,24 +16,11 @@ import {
 } from 'lucide-react'
 
 export default function Timer() {
-  const { currentWork, activeWorks, selectWork, fetchWorks } = useWorks()
+  const { currentWork, activeWorks, selectWork } = useWorks()
   const { timerConfig, updateTimerConfig } = useTimer()
   const [selectedWorkId, setSelectedWorkId] = useState<number | null>(
     currentWork?.id || null
   )
-
-  // 监听计时器完成事件，刷新作品列表
-  useEffect(() => {
-    const unsubscribe = on('timer:completed', (event) => {
-      console.log('Timer page received timer completed event')
-      // 刷新作品列表以更新作品时间
-      fetchWorks()
-    })
-
-    return () => {
-      unsubscribe()
-    }
-  }, [fetchWorks])
 
   const handleWorkChange = (workId: string) => {
     const id = parseInt(workId)

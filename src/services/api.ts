@@ -98,7 +98,7 @@ export class WorksAPI {
 
   // 获取作品统计
   static async getWorkStats(id: string): Promise<WorkStats> {
-    return tauriInvoke<WorkStats>('get_work_stats', { id: parseInt(id) })
+    return tauriInvoke<WorkStats>('get_work_stats', { work_id: parseInt(id) })
   }
 
   // 获取所有作品统计
@@ -116,7 +116,7 @@ export class TimerAPI {
     duration: number
   }): Promise<TimerSession> {
     // 确保参数格式正确
-    const work_id = data.workId ? Number(data.workId) : null
+    const work_id = data.workId !== undefined ? Number(data.workId) : null
     const mode = String(data.mode)
     const duration = Number(data.duration)
     
@@ -141,9 +141,9 @@ export class TimerAPI {
 
   // 停止计时
   static async stopTimer(sessionId: number, workId?: number, mode?: string, duration?: number): Promise<TimeRecord | null> {
-    return tauriInvoke<TimeRecord | null>('stop_timer', { 
+    return tauriInvoke<TimeRecord | null>('stop_timer', {
       session_id: sessionId,
-      work_id: workId,
+      work_id: workId === 0 ? 0 : workId, // 明确传递 0 而不是 undefined
       mode: mode,
       duration: duration
     })

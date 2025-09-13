@@ -5,9 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { WorkCard } from './WorkCard'
 import { useWorks } from '@/hooks/useWorks'
+import { WorksAPI } from '@/services/api'
 import { Work } from '@/types/work'
 import { Search, Plus, Filter, Grid, List, Archive } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { on } from '@/events/EventBus'
 
 interface WorkListProps {
   onCreateWork?: () => void
@@ -34,11 +36,96 @@ export function WorkList({ onCreateWork, onEditWork, className = '' }: WorkListP
   const [showArchived, setShowArchived] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [selectedWorkId, setSelectedWorkId] = useState<number | null>(null)
+  const [worksStats, setWorksStats] = useState<Record<number, any>>({})
 
-  // 加载作品列表
+  // 加载作品列表和统计数据
   useEffect(() => {
     loadWorks()
   }, [loadWorks])
+
+  // 加载所有作品的统计数据
+  useEffect(() => {
+    const loadAllWorksStats = async () => {
+      if (works.length > 0) {
+        try {
+          const statsPromises = works.map(async (work) => {
+            if (work && work.id) {
+              try {
+                const stats = await WorksAPI.getWorkStats(work.id.toString())
+                // 将后端返回的WorkStats格式映射为WorkCard需要的格式
+                const mappedStats = {
+                  total_time: stats.total_minutes || 0,
+                  explore_time: Math.floor((stats.total_minutes || 0) * 0.6), // 估算探索时间
+                  utilize_time: Math.floor((stats.total_minutes || 0) * 0.4), // 估算利用时间
+                  session_count: stats.session_count || 0,
+                  completion_rate: stats.progress_percentage || 0
+                }
+                return { [work.id]: mappedStats }
+              } catch (error) {
+                console.warn(`获取作品 ${work.id} 统计失败:`, error)
+                return { [work.id]: null }
+              }
+            }
+            return {}
+          })
+
+          const statsResults = await Promise.all(statsPromises)
+          const allStats = statsResults.reduce((acc, curr) => ({ ...acc, ...curr }), {})
+          setWorksStats(allStats)
+        } catch (error) {
+          console.error('加载作品统计数据失败:', error)
+        }
+      }
+    }
+
+    loadAllWorksStats()
+  }, [works])
+
+  // 监听计时器完成事件，刷新统计数据
+  useEffect(() => {
+    const unsubscribe = on('timer:completed', (event) => {
+      console.log('WorkList收到计时器完成事件:', event.payload)
+      // 重新加载统计数据
+      if (works.length > 0) {
+        const loadAllWorksStats = async () => {
+          try {
+            const statsPromises = works.map(async (work) => {
+              if (work && work.id) {
+                try {
+                  const stats = await WorksAPI.getWorkStats(work.id.toString())
+                  // 将后端返回的WorkStats格式映射为WorkCard需要的格式
+                  const mappedStats = {
+                    total_time: stats.total_minutes || 0,
+                    explore_time: Math.floor((stats.total_minutes || 0) * 0.6), // 估算探索时间
+                    utilize_time: Math.floor((stats.total_minutes || 0) * 0.4), // 估算利用时间
+                    session_count: stats.session_count || 0,
+                    completion_rate: stats.progress_percentage || 0
+                  }
+                  return { [work.id]: mappedStats }
+                } catch (error) {
+                  console.warn(`获取作品 ${work.id} 统计失败:`, error)
+                  return { [work.id]: null }
+                }
+              }
+              return {}
+            })
+
+            const statsResults = await Promise.all(statsPromises)
+            const allStats = statsResults.reduce((acc, curr) => ({ ...acc, ...curr }), {})
+            setWorksStats(allStats)
+          } catch (error) {
+            console.error('刷新作品统计数据失败:', error)
+          }
+        }
+
+        loadAllWorksStats()
+      }
+    })
+
+    return () => {
+      unsubscribe()
+    }
+  }, [works])
 
   // 过滤作品
   const filteredWorks = (showArchived ? archivedWorks : activeWorks).filter(work =>
@@ -232,6 +319,13 @@ export function WorkList({ onCreateWork, onEditWork, className = '' }: WorkListP
             <WorkCard
               key={work.id}
               work={work}
+              stats={worksStats[work.id] || {
+                total_time: 0,
+                explore_time: 0,
+                utilize_time: 0,
+                session_count: 0,
+                completion_rate: 0
+              }}
               isSelected={selectedWorkId === work.id}
               onEdit={handleWorkEdit}
               onDelete={handleWorkDelete}

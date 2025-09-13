@@ -22,10 +22,9 @@ export interface UpdateWorkParams extends Partial<CreateWorkParams> {
 
 export interface WorkStats {
   work_id: number;
-  total_time: number; // 总时间（分钟）
-  explore_time: number; // 探索模式时间
-  utilize_time: number; // 利用模式时间
+  target_hours: number;
+  total_minutes: number; // 总时间（分钟）
   session_count: number; // 会话次数
-  completion_rate: number; // 完成率
-  last_activity: string; // 最后活动时间
+  avg_duration: number; // 平均时长
+  progress_percentage: number; // 完成率
 }
