@@ -47,12 +47,14 @@ export class StoreEventManager {
         // 如果是当前作品，更新其统计
         if (currentWork && currentWork.id === workId) {
           console.log('Updating current work stats:', workId)
-          worksStore.fetchWorkStats(workId)
+          // 防抖：避免重复调用
+          setTimeout(() => {
+            worksStore.fetchWorkStats(workId)
+          }, 500)
         }
 
-        // 重新获取作品列表以更新时间
-        console.log('Refreshing works list')
-        worksStore.fetchWorks()
+        // 不再重新获取整个作品列表，避免循环调用
+        // 作品列表的刷新应该由具体的作品操作触发，而不是计时器完成
       }
 
       // 强制刷新分析数据

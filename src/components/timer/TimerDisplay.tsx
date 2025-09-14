@@ -63,7 +63,13 @@ export function TimerDisplay({ className = '', compact = false }: TimerDisplayPr
     } else if (timerState === 'paused') {
       await resumeTimer()
     } else {
-      await startTimer(timerMode, selectedWorkId || undefined)
+      // 确保有选择作品或当前工作
+      const workId = selectedWorkId || currentWork?.id
+      if (!workId) {
+        toast.warning('请先选择一个作品')
+        return
+      }
+      await startTimer(timerMode, workId)
     }
   }
 

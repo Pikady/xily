@@ -28,8 +28,17 @@ const API_CONFIG = {
 
 // Tauri命令调用包装器
 async function tauriInvoke<T>(command: string, args?: any): Promise<T> {
+  console.log(`🔍 调用 Tauri 命令: ${command}`, args)
   return await errorHandler.withErrorHandling(async () => {
-    return await invoke<T>(command, args)
+    try {
+      const result = await invoke<T>(command, args)
+      console.log(`✅ Tauri 命令 ${command} 成功返回`, result)
+      return result
+    } catch (invokeError) {
+      console.error(`❌ Tauri 命令 ${command} 调用失败:`, invokeError)
+      console.error(`参数:`, args)
+      throw invokeError
+    }
   }, {
     code: ErrorCodes.API_ERROR,
     message: `Tauri命令调用失败: ${command}`,
@@ -98,7 +107,8 @@ export class WorksAPI {
 
   // 获取作品统计
   static async getWorkStats(id: string): Promise<WorkStats> {
-    return tauriInvoke<WorkStats>('get_work_stats', { work_id: parseInt(id) })
+    // 使用与 get_work_progress 相同的参数名 workId
+    return tauriInvoke<WorkStats>('get_work_stats', { workId: parseInt(id) })
   }
 
   // 获取所有作品统计
@@ -141,12 +151,19 @@ export class TimerAPI {
 
   // 停止计时
   static async stopTimer(sessionId: number, workId?: number, mode?: string, duration?: number): Promise<TimeRecord | null> {
-    return tauriInvoke<TimeRecord | null>('stop_timer', {
-      session_id: sessionId,
-      work_id: workId === 0 ? 0 : workId, // 明确传递 0 而不是 undefined
-      mode: mode,
-      duration: duration
-    })
+    // 确保参数类型正确，使用后端期望的camelCase参数名
+    const params = {
+      sessionId: Number(sessionId),
+      workId: Number(workId) || 0, // 如果没有workId，使用0
+      mode: String(mode || 'explore'),
+      duration: Number(duration) || 25
+    }
+
+    console.log('stopTimer params:', params)
+    console.log('sessionId type:', typeof params.sessionId, 'value:', params.sessionId)
+    console.log('workId type:', typeof params.workId, 'value:', params.workId)
+
+    return tauriInvoke<TimeRecord | null>('stop_timer', params)
   }
 
   // 获取计时器配置
@@ -156,7 +173,17 @@ export class TimerAPI {
 
   // 更新计时器配置
   static async updateTimerConfig(config: Partial<TimerConfig>): Promise<TimerConfig> {
-    return tauriInvoke<TimerConfig>('save_timer_config', config)
+    // 构建完整的配置对象，使用后端期望的蛇形命名法
+    const completeConfig = {
+      focus_duration: config.focusDuration ?? 25,
+      short_break: config.shortBreak ?? 5,
+      long_break: config.longBreak ?? 15,
+      auto_start_breaks: config.autoStartBreaks ?? false,
+      auto_start_pomodoros: config.autoStartPomodoros ?? false
+    }
+
+    // 后端期望参数被包装在 config 对象中
+    return tauriInvoke<TimerConfig>('save_timer_config', { config: completeConfig })
   }
 
   // 获取计时历史

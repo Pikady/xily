@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { WorkCard } from './WorkCard'
 import { useWorks } from '@/hooks/useWorks'
 import { WorksAPI } from '@/services/api'
-import { Work } from '@/types/work'
+import { Work, WorkStats } from '@/types/work'
 import { Search, Plus, Filter, Grid, List, Archive } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { on } from '@/events/EventBus'
@@ -36,7 +36,9 @@ export function WorkList({ onCreateWork, onEditWork, className = '' }: WorkListP
   const [showArchived, setShowArchived] = useState(false)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [selectedWorkId, setSelectedWorkId] = useState<number | null>(null)
-  const [worksStats, setWorksStats] = useState<Record<number, any>>({})
+  const [worksStats, setWorksStats] = useState<Record<number, { total_time: number; explore_time: number; utilize_time: number; session_count: number; completion_rate: number; }>>({})
+  const lastLoadTime = useRef<number>(0)
+  const isLoadingRef = useRef<boolean>(false)
 
   // 加载作品列表和统计数据
   useEffect(() => {
@@ -44,88 +46,82 @@ export function WorkList({ onCreateWork, onEditWork, className = '' }: WorkListP
   }, [loadWorks])
 
   // 加载所有作品的统计数据
-  useEffect(() => {
-    const loadAllWorksStats = async () => {
-      if (works.length > 0) {
-        try {
-          const statsPromises = works.map(async (work) => {
-            if (work && work.id) {
-              try {
-                const stats = await WorksAPI.getWorkStats(work.id.toString())
-                // 将后端返回的WorkStats格式映射为WorkCard需要的格式
-                const mappedStats = {
-                  total_time: stats.total_minutes || 0,
-                  explore_time: stats.explore_time || 0,
-                  utilize_time: stats.utilize_time || 0,
-                  session_count: stats.session_count || 0,
-                  completion_rate: stats.progress_percentage || 0
-                }
-                return { [work.id]: mappedStats }
-              } catch (error) {
-                console.warn(`获取作品 ${work.id} 统计失败:`, error)
-                return { [work.id]: null }
-              }
-            }
-            return {}
-          })
-
-          const statsResults = await Promise.all(statsPromises)
-          const allStats = statsResults.reduce((acc, curr) => ({ ...acc, ...curr }), {})
-          setWorksStats(allStats)
-        } catch (error) {
-          console.error('加载作品统计数据失败:', error)
-        }
-      }
+  const loadAllWorksStats = useCallback(async () => {
+    // 防抖：避免在短时间内重复调用
+    const now = Date.now()
+    if (isLoadingRef.current || (now - lastLoadTime.current < 1000)) {
+      console.log('🔍 loadAllWorksStats 跳过，距离上次调用时间太短或正在加载')
+      return
     }
 
-    loadAllWorksStats()
+    if (works.length > 0) {
+      isLoadingRef.current = true
+      lastLoadTime.current = now
+
+      try {
+        console.log('🔍 作品列表:', works.map(w => ({ id: w.id, name: w.name })))
+        const statsPromises = works.map(async (work) => {
+          if (work && work.id) {
+            try {
+              console.log('🔍 尝试获取作品统计, work.id:', work.id)
+              const stats = await WorksAPI.getWorkStats(work.id.toString())
+              // 将后端返回的WorkStats格式映射为WorkCard需要的格式
+              const mappedStats = {
+                total_time: stats.total_minutes || 0,
+                explore_time: stats.explore_time || 0,
+                utilize_time: stats.utilize_time || 0,
+                session_count: stats.session_count || 0,
+                completion_rate: stats.progress_percentage || 0
+              }
+              return { [work.id]: mappedStats }
+            } catch (error) {
+              console.warn(`获取作品 ${work.id} 统计失败:`, error)
+              // 返回默认统计值而不是null，避免前端错误
+              return { [work.id]: {
+                total_time: 0,
+                explore_time: 0,
+                utilize_time: 0,
+                session_count: 0,
+                completion_rate: 0
+              } }
+            }
+          }
+          return {}
+        })
+
+        const statsResults = await Promise.all(statsPromises)
+        const allStats = statsResults.reduce<Record<number, { total_time: number; explore_time: number; utilize_time: number; session_count: number; completion_rate: number; }>>((acc, curr) => ({ ...acc, ...curr }), {})
+        setWorksStats(allStats)
+      } catch (error) {
+        console.error('加载作品统计数据失败:', error)
+      } finally {
+        isLoadingRef.current = false
+      }
+    }
   }, [works])
+
+  // 初始加载统计数据
+  useEffect(() => {
+    console.log('🔍 WorkList useEffect triggered, works.length:', works.length)
+    if (works.length > 0) {
+      console.log('🔍 开始加载作品统计数据, 作品数量:', works.length)
+      loadAllWorksStats()
+    } else {
+      console.log('🔍 没有作品，跳过统计数据加载')
+    }
+  }, [works.length]) // 移除 loadAllWorksStats 依赖，避免循环调用
 
   // 监听计时器完成事件，刷新统计数据
   useEffect(() => {
     const unsubscribe = on('timer:completed', (event) => {
       console.log('WorkList收到计时器完成事件:', event.payload)
-      // 重新加载统计数据
-      if (works.length > 0) {
-        const loadAllWorksStats = async () => {
-          try {
-            const statsPromises = works.map(async (work) => {
-              if (work && work.id) {
-                try {
-                  const stats = await WorksAPI.getWorkStats(work.id.toString())
-                  // 将后端返回的WorkStats格式映射为WorkCard需要的格式
-                  const mappedStats = {
-                    total_time: stats.total_minutes || 0,
-                    explore_time: stats.explore_time || 0,
-                    utilize_time: stats.utilize_time || 0,
-                    session_count: stats.session_count || 0,
-                    completion_rate: stats.progress_percentage || 0
-                  }
-                  return { [work.id]: mappedStats }
-                } catch (error) {
-                  console.warn(`获取作品 ${work.id} 统计失败:`, error)
-                  return { [work.id]: null }
-                }
-              }
-              return {}
-            })
-
-            const statsResults = await Promise.all(statsPromises)
-            const allStats = statsResults.reduce((acc, curr) => ({ ...acc, ...curr }), {})
-            setWorksStats(allStats)
-          } catch (error) {
-            console.error('刷新作品统计数据失败:', error)
-          }
-        }
-
-        loadAllWorksStats()
-      }
+      // 统计数据刷新由 StoreEventManager 统一处理，这里不再重复调用
     })
 
     return () => {
       unsubscribe()
     }
-  }, [works])
+  }, []) // 空依赖数组，只绑定一次
 
   // 过滤作品
   const filteredWorks = (showArchived ? archivedWorks : activeWorks).filter(work =>

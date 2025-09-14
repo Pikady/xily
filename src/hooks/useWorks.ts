@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 import { useWorksStore } from '@/stores/worksStore'
 import { Work, CreateWorkParams, UpdateWorkParams } from '@/types/work'
 
@@ -24,13 +24,21 @@ export const useWorks = () => {
   } = useWorksStore()
 
   // 兼容持久化/初始化阶段的空值
-  const worksList = Array.isArray(works) ? works.filter(work => work !== null && work !== undefined) : []
+  const worksList = useMemo(() => {
+    const filtered = Array.isArray(works) ? works.filter(work => work !== null && work !== undefined) : []
+    console.log('🔍 useWorks worksList updated, length:', filtered.length)
+    return filtered
+  }, [works])
 
   // 获取活跃作品（未归档）
-  const activeWorks = worksList.filter(work => work && !work.is_archived)
-  
+  const activeWorks = useMemo(() => {
+    return worksList.filter(work => work && !work.is_archived)
+  }, [worksList])
+
   // 获取已归档作品
-  const archivedWorks = worksList.filter(work => work && work.is_archived)
+  const archivedWorks = useMemo(() => {
+    return worksList.filter(work => work && work.is_archived)
+  }, [worksList])
 
   // 创建作品
   const createWork = useCallback(async (workData: CreateWorkParams) => {

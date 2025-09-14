@@ -51,11 +51,14 @@ impl TimerService {
 
     pub fn stop_timer(session_id: Option<i64>, work_id: Option<i64>, mode: Option<String>, duration: Option<i32>) -> Result<Option<TimeRecord>> {
         // 根据前端传来的参数创建时间记录，使用默认值处理None
-        let w_id = work_id.unwrap_or(0);
-        let m = mode.unwrap_or_else(|| "explore".to_string());
+        let w_id = work_id.clone().unwrap_or(0);
+        let m = mode.clone().unwrap_or_else(|| "explore".to_string());
         let d = duration.unwrap_or(25); // 默认25分钟
-        
-        if w_id > 0 || d > 0 { // 只要有work_id或duration就创建记录
+
+        println!("🎯 stop_timer called with work_id: {:?}, mode: {:?}, duration: {:?}", work_id, mode, duration);
+        println!("🎯 Processed values: w_id: {}, m: {}, d: {}", w_id, m, d);
+
+        if d > 0 { // 只要duration > 0就创建记录，即使work_id为0（未分类时间）
             let end_time = Utc::now();
             let start_time = end_time - chrono::Duration::minutes(d as i64);
             
@@ -87,7 +90,7 @@ impl TimerService {
                 [],
             )?;
             
-            conn.execute(
+            let result = conn.execute(
                 "INSERT INTO time_records (work_id, mode, duration, start_time, end_time, is_completed) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
                 params![
                     record.work_id,
@@ -98,7 +101,9 @@ impl TimerService {
                     record.is_completed
                 ],
             )?;
-            
+
+            println!("🎯 Inserted time record: work_id: {:?}, duration: {}, mode: {}, affected rows: {}", record.work_id, record.duration, record.mode, result);
+
             // 如果提供了session_id，更新对应session状态
             if let Some(sid) = session_id {
                 conn.execute(
@@ -106,7 +111,7 @@ impl TimerService {
                     params![sid],
                 )?;
             }
-            
+
             Ok(Some(record))
         } else {
             Ok(None)

@@ -66,19 +66,25 @@ export const useTimerStore = create<TimerStoreState>()(
       startTimer: async (mode: TimerMode, workId?: number) => {
         try {
           set({ loading: true, error: null })
-          
+
           const duration = get().config.focusDuration
-          
-          // 如果没有选择作品，显示提示但允许继续
+
+          console.log('🚀 startTimer called with mode:', mode, 'workId:', workId)
+
+          // 确保选择了作品
           if (!workId) {
-            console.log('未选择作品，将开始无归属的计时')
+            set({ loading: false, error: '请先选择一个作品再开始计时' })
+            return
           }
-          
+
           // 仅记录开始计时，不依赖后端返回session
           const startTime = Date.now()
+          const finalWorkId = workId
+          console.log('🔧 Creating session with finalWorkId:', finalWorkId, 'original workId:', workId)
+
           const tempSession: TimerSession = {
             id: Date.now(), // 临时ID，完成时替换
-            workId: workId || 0,
+            workId: finalWorkId,
             mode,
             duration,
             actualDuration: 0,
@@ -202,12 +208,8 @@ export const useTimerStore = create<TimerStoreState>()(
       stopTimer: async () => {
         try {
           set({ loading: true, error: null })
-          
+
           if (get().currentSession) {
-            // 异步通知后端停止（不等待完成）
-            TimerAPI.stopTimer(get().currentSession!.id).catch(error => {
-              console.warn('后端计时停止失败:', error)
-            })
             await get().completeSession()
           }
           
@@ -274,13 +276,20 @@ export const useTimerStore = create<TimerStoreState>()(
         try {
           const elapsed = Math.floor((Date.now() - (state.startTime || 0)) / 1000)
           const newRemainingTime = Math.max(0, (state.config.focusDuration * 60) - elapsed)
+          const actualDurationMinutes = Math.floor(elapsed / 60)
 
           set((draft) => {
             draft.remainingTime = newRemainingTime
-            
+
+            // 更新实际持续时间
+            if (draft.currentSession) {
+              draft.currentSession.actualDuration = actualDurationMinutes
+            }
+
             if (newRemainingTime === 0 && draft.currentSession) {
               draft.state = 'completed'
               draft.isRunning = false
+              draft.currentSession.isCompleted = true
             }
           })
         } catch (error) {
@@ -308,12 +317,31 @@ export const useTimerStore = create<TimerStoreState>()(
               draft.loading = false
             })
             
+            // 使用实际持续时间而不是预定持续时间
+            const actualDuration = state.currentSession?.actualDuration || state.currentSession?.duration || state.config.focusDuration
+            const sessionWorkId = state.currentSession?.workId
+            console.log('💾 保存计时记录:', {
+              sessionId,
+              sessionWorkId,
+              actualDuration,
+              mode: state.currentSession?.mode,
+              fullSession: state.currentSession
+            })
+
             // 异步保存到后端（不等待完成）
+            console.log('🔧 调用 stopTimer API:', {
+              sessionId,
+              sessionWorkId,
+              finalWorkId: sessionWorkId || 0,
+              mode: state.currentSession?.mode,
+              actualDuration
+            })
+
             TimerAPI.stopTimer(
-              sessionId, 
-              state.currentSession?.workId || 0, 
-              state.currentSession?.mode || 'explore', 
-              state.currentSession?.duration || state.config.focusDuration
+              sessionId,
+              sessionWorkId || 0,
+              state.currentSession?.mode || 'explore',
+              actualDuration
             ).catch(error => {
               console.warn('后端计时保存失败:', error)
             })

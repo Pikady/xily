@@ -106,12 +106,17 @@ export function TimerController({
   // 开始计时器
   const handleStart = async (mode: TimerMode, workId?: number) => {
     try {
+      console.log('🎮 TimerController handleStart called with mode:', mode, 'workId:', workId, 'currentWork:', currentWork)
+
       if (!currentWork && !workId) {
         toast.warning('请先选择一个作品')
         return
       }
-      
-      await startTimer(mode, workId || currentWork?.id)
+
+      const finalWorkId = workId || currentWork?.id
+      console.log('🎮 Final workId to use:', finalWorkId)
+
+      await startTimer(mode, finalWorkId)
       
       const modeText = mode === 'explore' ? '探索' : '利用'
       toast.success(`开始${modeText}模式专注`)

@@ -152,7 +152,16 @@ impl AnalyticsService {
     }
 
     pub fn get_work_progress(work_id: i64) -> Result<WorkProgress> {
-        let conn = get_connection()?;
+        println!("📊 get_work_progress called with work_id: {}", work_id);
+
+        let conn = match get_connection() {
+            Ok(conn) => conn,
+            Err(e) => {
+                println!("📊 Failed to get database connection: {}", e);
+                return Err(rusqlite::Error::InvalidColumnType(0, format!("Database connection failed: {}", e), rusqlite::types::Type::Null));
+            }
+        };
+
         let query = "
             SELECT
                 w.target_hours,
@@ -168,8 +177,21 @@ impl AnalyticsService {
 
         println!("📊 get_work_progress query for work_id {}: {}", work_id, query);
 
-        let mut stmt = conn.prepare(query)?;
-        let mut rows = stmt.query(params![work_id])?;
+        let mut stmt = match conn.prepare(query) {
+            Ok(stmt) => stmt,
+            Err(e) => {
+                println!("📊 Failed to prepare query: {}", e);
+                return Err(e);
+            }
+        };
+
+        let mut rows = match stmt.query(params![work_id]) {
+            Ok(rows) => rows,
+            Err(e) => {
+                println!("📊 Failed to execute query: {}", e);
+                return Err(e);
+            }
+        };
 
         if let Some(row) = rows.next()? {
             let target_hours: i32 = row.get(0)?;

@@ -29,8 +29,10 @@ pub async fn resume_timer(session_id: Option<i64>) -> Result<bool, String> {
 }
 
 #[tauri::command]
-pub async fn stop_timer(session_id: Option<i64>, work_id: Option<i64>, mode: Option<String>, duration: Option<i32>) -> Result<Option<TimeRecord>, String> {
-    TimerService::stop_timer(session_id, work_id, mode, duration)
+pub async fn stop_timer(sessionId: i64, workId: i64, mode: String, duration: i32) -> Result<Option<TimeRecord>, String> {
+    println!("🎯 stop_timer called with parameters: sessionId={}, workId={}, mode={}, duration={}", sessionId, workId, mode, duration);
+
+    TimerService::stop_timer(Some(sessionId), Some(workId), Some(mode), Some(duration))
         .map_err(|e| e.to_string())
 }
 
