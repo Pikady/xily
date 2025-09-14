@@ -33,4 +33,5 @@ export interface FloatWindowCallbacks {
   onWorkChange?: (workId: number) => void
   onClose?: () => void
   onExpand?: () => void
+  onMoveWindow?: (x: number, y: number) => Promise<void>
 }

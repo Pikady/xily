@@ -128,25 +128,39 @@ export function FloatWindowNew({
   }, [setStorePosition])
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.target === windowRef.current || (e.target as HTMLElement).closest('.float-window-header')) {
-      setIsDragging(true)
-      setDragOffset({
-        x: e.clientX - position.x,
-        y: e.clientY - position.y
-      })
-      document.body.style.cursor = 'grabbing'
-      document.body.style.userSelect = 'none'
+    // 如果点击的是按钮，不触发拖拽
+    if ((e.target as HTMLElement).closest('button')) {
+      return
     }
-  }, [position])
+    
+    // 允许在窗口任何地方拖拽，但排除按钮
+    e.preventDefault()
+    setIsDragging(true)
+    setDragOffset({
+      x: e.clientX,
+      y: e.clientY
+    })
+    document.body.style.cursor = 'grabbing'
+    document.body.style.userSelect = 'none'
+  }, [])
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
+  const handleMouseMove = useCallback(async (e: MouseEvent) => {
     if (!isDragging) return
 
-    const newX = e.clientX - dragOffset.x
-    const newY = e.clientY - dragOffset.y
+    const deltaX = e.clientX - dragOffset.x
+    const deltaY = e.clientY - dragOffset.y
+    
+    const newX = position.x + deltaX
+    const newY = position.y + deltaY
 
-    savePosition({ x: newX, y: newY })
-  }, [isDragging, dragOffset, savePosition])
+    // 通过 Tauri API 移动窗口
+    try {
+      await callbacks?.onMoveWindow?.(newX, newY)
+      savePosition({ x: newX, y: newY })
+    } catch (error) {
+      console.error('移动窗口失败:', error)
+    }
+  }, [isDragging, dragOffset, position, savePosition, callbacks])
 
   const handleMouseUp = useCallback(() => {
     if (isDragging) {
@@ -330,6 +344,45 @@ export function FloatWindowNew({
                 onStop={handleStopTimer}
                 disabled={loading || timerLoading || !currentWork}
               />
+            </div>
+          )}
+
+          {/* 最小化状态显示 */}
+          {isMinimized && (
+            <div className="flex items-center justify-between px-3 py-2 h-full">
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-1">
+                  {getModeIcon(mode)}
+                  <span className="text-sm font-medium">
+                    {formattedTime}
+                  </span>
+                </div>
+                <div className="w-16 h-1 bg-gray-200 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-blue-500 transition-all duration-300"
+                    style={{ width: `${progressPercentage}%` }}
+                  />
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={state === 'paused' ? handleResumeTimer : handleStartTimer}
+                  disabled={loading || timerLoading || !currentWork}
+                  className={cn(
+                    'h-6 w-6 p-0',
+                    state === 'running' && 'bg-red-100 text-red-600 hover:bg-red-200'
+                  )}
+                >
+                  {state === 'running' ? (
+                    <Pause className="w-3 h-3" />
+                  ) : (
+                    <Play className="w-3 h-3" />
+                  )}
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>

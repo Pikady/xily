@@ -171,6 +171,16 @@ export function FloatWindowManager({
     onExpand: () => {
       console.log('展开到主界面')
       onExpand?.()
+    },
+
+    onMoveWindow: async (x: number, y: number) => {
+      try {
+        await WindowAPI.setFloatWindowPosition(x, y)
+        console.log('移动悬浮窗到:', { x, y })
+      } catch (error) {
+        console.error('移动悬浮窗失败:', error)
+        throw error
+      }
     }
   }
 
