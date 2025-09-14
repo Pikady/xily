@@ -181,6 +181,16 @@ export function FloatWindowManager({
         console.error('移动悬浮窗失败:', error)
         throw error
       }
+    },
+
+    onResizeWindow: async (width: number, height: number) => {
+      try {
+        await WindowAPI.resizeFloatWindow(width, height)
+        console.log('调整悬浮窗尺寸到:', { width, height })
+      } catch (error) {
+        console.error('调整悬浮窗尺寸失败:', error)
+        throw error
+      }
     }
   }
 

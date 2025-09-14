@@ -478,6 +478,11 @@ export class WindowAPI {
     return tauriInvoke<boolean>('is_float_window_visible')
   }
 
+  // 调整悬浮窗尺寸
+  static async resizeFloatWindow(width: number, height: number): Promise<void> {
+    return tauriInvoke<void>('resize_float_window', { width, height })
+  }
+
   // 检查主窗口是否可见
   static async isMainWindowVisible(): Promise<boolean> {
     return tauriInvoke<boolean>('is_main_window_visible')

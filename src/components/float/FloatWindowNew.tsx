@@ -275,8 +275,24 @@ export function FloatWindowNew({
     }
   }
 
-  const handleMinimize = () => {
-    setMinimized(!isMinimized)
+  const handleMinimize = async () => {
+    const newMinimizedState = !isMinimized
+    setMinimized(newMinimizedState)
+    
+    // 调整窗口尺寸
+    try {
+      if (newMinimizedState) {
+        // 最小化时调整到 256x64
+        await callbacks?.onResizeWindow?.(256, 64)
+        console.log('最小化悬浮窗并调整尺寸到 256x64')
+      } else {
+        // 展开时调整到 320x480
+        await callbacks?.onResizeWindow?.(320, 480)
+        console.log('展开悬浮窗并调整尺寸到 320x480')
+      }
+    } catch (error) {
+      console.error('调整悬浮窗尺寸失败:', error)
+    }
   }
 
   const handleExpand = () => {

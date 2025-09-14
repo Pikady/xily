@@ -34,4 +34,5 @@ export interface FloatWindowCallbacks {
   onClose?: () => void
   onExpand?: () => void
   onMoveWindow?: (x: number, y: number) => Promise<void>
+  onResizeWindow?: (width: number, height: number) => Promise<void>
 }
