@@ -86,7 +86,7 @@ const DEFAULT_STRATEGIES: Record<ErrorCategory, ErrorHandlingStrategy> = {
 export class ErrorHandler {
   private static instance: ErrorHandler
   private errors: AppError[] = []
-  private handlers: Map<string, (error: AppError) => void> = new Map()
+  private handlers: Map<string, (error: AppError) => Promise<void> | void> = new Map()
   private maxErrors = 100
 
   private constructor() {}
@@ -238,7 +238,7 @@ export class ErrorHandler {
   }
 
   // 注册错误处理器
-  registerHandler(errorCode: string, handler: (error: AppError) => void): () => void {
+  registerHandler(errorCode: string, handler: (error: AppError) => Promise<void> | void): () => void {
     this.handlers.set(errorCode, handler)
     
     return () => {
@@ -266,8 +266,9 @@ export class ErrorHandler {
       if (filter.source) {
         errors = errors.filter(e => e.source === filter.source)
       }
-      if (filter.since) {
-        errors = errors.filter(e => e.timestamp >= filter.since)
+      const since = filter.since
+      if (since !== undefined) {
+        errors = errors.filter(e => e.timestamp >= since)
       }
       if (filter.limit) {
         errors = errors.slice(-filter.limit)
@@ -355,7 +356,7 @@ export class ErrorHandler {
   }
 
   private generateErrorId(): string {
-    return `error_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    return `error_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
   }
 
   private delay(ms: number): Promise<void> {

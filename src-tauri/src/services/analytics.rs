@@ -158,7 +158,9 @@ impl AnalyticsService {
                 w.target_hours,
                 COALESCE(SUM(tr.duration), 0) as total_minutes,
                 COALESCE(COUNT(tr.id), 0) as session_count,
-                COALESCE(AVG(tr.duration), 0) as avg_duration
+                COALESCE(AVG(tr.duration), 0) as avg_duration,
+                COALESCE(SUM(CASE WHEN tr.mode = 'explore' THEN tr.duration ELSE 0 END), 0) as explore_time,
+                COALESCE(SUM(CASE WHEN tr.mode = 'utilize' THEN tr.duration ELSE 0 END), 0) as utilize_time
              FROM works w
              LEFT JOIN time_records tr ON w.id = tr.work_id
              WHERE w.id = ?1
@@ -174,6 +176,8 @@ impl AnalyticsService {
             let total_minutes: i32 = row.get(1)?;
             let session_count: i32 = row.get(2)?;
             let avg_duration: f64 = row.get(3)?;
+            let explore_time: i32 = row.get(4)?;
+            let utilize_time: i32 = row.get(5)?;
 
             let progress_percentage = if target_hours > 0 {
                 (total_minutes as f64 / (target_hours * 60) as f64) * 100.0
@@ -181,8 +185,8 @@ impl AnalyticsService {
                 0.0
             };
 
-            println!("📊 Work {} progress: {}m / {}h = {:.1}%, {} sessions",
-                     work_id, total_minutes, target_hours, progress_percentage, session_count);
+            println!("📊 Work {} progress: {}m / {}h = {:.1}%, {} sessions (explore: {}m, utilize: {}m)",
+                     work_id, total_minutes, target_hours, progress_percentage, session_count, explore_time, utilize_time);
 
             Ok(WorkProgress {
                 work_id,
@@ -191,6 +195,8 @@ impl AnalyticsService {
                 session_count,
                 avg_duration,
                 progress_percentage,
+                explore_time,
+                utilize_time,
             })
         } else {
             println!("📊 No work found for work_id {}, returning empty progress", work_id);
@@ -201,6 +207,8 @@ impl AnalyticsService {
                 session_count: 0,
                 avg_duration: 0.0,
                 progress_percentage: 0.0,
+                explore_time: 0,
+                utilize_time: 0,
             })
         }
     }
@@ -262,6 +270,8 @@ pub struct WorkProgress {
     pub session_count: i32,
     pub avg_duration: f64,
     pub progress_percentage: f64,
+    pub explore_time: i32,
+    pub utilize_time: i32,
 }
 
 #[derive(Debug, serde::Serialize)]

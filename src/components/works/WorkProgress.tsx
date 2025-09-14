@@ -23,7 +23,7 @@ interface WorkProgressProps {
 export function WorkProgress({ work, stats, className = '' }: WorkProgressProps) {
   // 计算完成进度
   const progressPercentage = work.target_hours > 0 
-    ? Math.min((stats?.total_time || 0) / (work.target_hours * 60) * 100, 100)
+    ? Math.min((stats?.total_minutes || 0) / (work.target_hours * 60) * 100, 100)
     : 0
 
   // 格式化时间显示
@@ -49,11 +49,11 @@ export function WorkProgress({ work, stats, className = '' }: WorkProgressProps)
   }
 
   // 计算剩余时间
-  const remainingTime = Math.max(work.target_hours * 60 - (stats?.total_time || 0), 0)
+  const remainingTime = Math.max(work.target_hours * 60 - (stats?.total_minutes || 0), 0)
   
   // 计算平均每次专注时间
   const averageSessionTime = stats?.session_count && stats.session_count > 0 
-    ? stats.total_time / stats.session_count 
+    ? stats.total_minutes / stats.session_count 
     : 0
 
   // 计算预估完成时间
@@ -85,7 +85,7 @@ export function WorkProgress({ work, stats, className = '' }: WorkProgressProps)
             </div>
             <Progress value={progressPercentage} className="h-3" />
             <div className="flex justify-between text-sm text-muted-foreground">
-              <span>已完成: {formatTime(stats?.total_time || 0)}</span>
+              <span>已完成: {formatTime(stats?.total_minutes || 0)}</span>
               <span>目标: {work.target_hours}h</span>
               {remainingTime > 0 && (
                 <span>剩余: {formatTime(remainingTime)}</span>
@@ -115,7 +115,7 @@ export function WorkProgress({ work, stats, className = '' }: WorkProgressProps)
             </div>
             <div className="text-center p-3 bg-muted/50 rounded-lg">
               <div className="text-2xl font-bold text-purple-600">
-                {stats?.completion_rate?.toFixed(0) || 0}%
+                {stats?.progress_percentage?.toFixed(0) || 0}%
               </div>
               <div className="text-xs text-muted-foreground">完成率</div>
             </div>
@@ -144,7 +144,7 @@ export function WorkProgress({ work, stats, className = '' }: WorkProgressProps)
                   <div className="text-right">
                     <div className="font-medium">{formatTime(stats.explore_time)}</div>
                     <div className="text-xs text-muted-foreground">
-                      {stats.total_time > 0 ? ((stats.explore_time / stats.total_time) * 100).toFixed(1) : 0}%
+                      {stats.total_minutes > 0 ? ((stats.explore_time / stats.total_minutes) * 100).toFixed(1) : 0}%
                     </div>
                   </div>
                 </div>
@@ -157,7 +157,7 @@ export function WorkProgress({ work, stats, className = '' }: WorkProgressProps)
                   <div className="text-right">
                     <div className="font-medium">{formatTime(stats.utilize_time)}</div>
                     <div className="text-xs text-muted-foreground">
-                      {stats.total_time > 0 ? ((stats.utilize_time / stats.total_time) * 100).toFixed(1) : 0}%
+                      {stats.total_minutes > 0 ? ((stats.utilize_time / stats.total_minutes) * 100).toFixed(1) : 0}%
                     </div>
                   </div>
                 </div>
@@ -240,17 +240,17 @@ export function WorkProgress({ work, stats, className = '' }: WorkProgressProps)
                 </Badge>
               )}
               
-              {stats.completion_rate >= 80 && (
+              {stats.progress_percentage >= 80 && (
                 <Badge variant="outline" className="border-green-500 text-green-700">
                   <Target className="h-3 w-3 mr-1" />
-                  高效执行 ({stats.completion_rate.toFixed(0)}%)
+                  高效执行 ({stats.progress_percentage.toFixed(0)}%)
                 </Badge>
               )}
               
-              {stats.total_time >= 600 && (
+              {stats.total_minutes >= 600 && (
                 <Badge variant="outline" className="border-orange-500 text-orange-700">
                   <Clock className="h-3 w-3 mr-1" />
-                  时间大师 ({formatTime(stats.total_time)})
+                  时间大师 ({formatTime(stats.total_minutes)})
                 </Badge>
               )}
             </div>

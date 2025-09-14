@@ -55,8 +55,8 @@ export function WorkList({ onCreateWork, onEditWork, className = '' }: WorkListP
                 // 将后端返回的WorkStats格式映射为WorkCard需要的格式
                 const mappedStats = {
                   total_time: stats.total_minutes || 0,
-                  explore_time: Math.floor((stats.total_minutes || 0) * 0.6), // 估算探索时间
-                  utilize_time: Math.floor((stats.total_minutes || 0) * 0.4), // 估算利用时间
+                  explore_time: stats.explore_time || 0,
+                  utilize_time: stats.utilize_time || 0,
                   session_count: stats.session_count || 0,
                   completion_rate: stats.progress_percentage || 0
                 }
@@ -96,8 +96,8 @@ export function WorkList({ onCreateWork, onEditWork, className = '' }: WorkListP
                   // 将后端返回的WorkStats格式映射为WorkCard需要的格式
                   const mappedStats = {
                     total_time: stats.total_minutes || 0,
-                    explore_time: Math.floor((stats.total_minutes || 0) * 0.6), // 估算探索时间
-                    utilize_time: Math.floor((stats.total_minutes || 0) * 0.4), // 估算利用时间
+                    explore_time: stats.explore_time || 0,
+                    utilize_time: stats.utilize_time || 0,
                     session_count: stats.session_count || 0,
                     completion_rate: stats.progress_percentage || 0
                   }
