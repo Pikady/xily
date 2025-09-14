@@ -20,15 +20,16 @@
       },
       {
         "title": "悬浮窗",
-        "width": 200,
-        "height": 200,
+        "width": 320,
+        "height": 300,
         "label": "float",
         "decorations": false,
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "visible": false,
         "transparent": true,
-        "resizable": false
+        "resizable": false,
+        "url": "float.html"
       }
     ],
     "security": {

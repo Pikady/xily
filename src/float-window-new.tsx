@@ -11,13 +11,11 @@ const FloatWindowApp = () => {
   }
 
   return (
-    <div className="w-full h-full bg-transparent flex items-center justify-center">
-      <FloatWindowManager onExpand={handleExpand} />
-    </div>
+    <FloatWindowManager onExpand={handleExpand} />
   )
 }
 
-// 初始化悬浮窗应用
+// 初始化悬浮窗
 const container = document.getElementById('float-root')
 if (container) {
   const root = createRoot(container)

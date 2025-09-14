@@ -66,7 +66,7 @@ export function TimerDisplay({ className = '', compact = false }: TimerDisplayPr
       // 确保有选择作品或当前工作
       const workId = selectedWorkId || currentWork?.id
       if (!workId) {
-        toast.warning('请先选择一个作品')
+        console.warn('请先选择一个作品')
         return
       }
       await startTimer(timerMode, workId)
