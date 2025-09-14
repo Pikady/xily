@@ -67,7 +67,7 @@ export function FloatWindowNew({
     setTimerMode
   } = useTimer()
 
-  const { currentWork, works: hookWorks, setCurrentWork } = useWorks()
+  const { currentWork, works: hookWorks, selectWork } = useWorks()
 
   // 本地状态
   const [isDragging, setIsDragging] = useState(false)
@@ -85,10 +85,10 @@ export function FloatWindowNew({
     if (externalWorks.length > 0) {
       setWorks(externalWorks)
       if (!currentWork && externalWorks.length > 0) {
-        setCurrentWork(externalWorks[0])
+        selectWork(externalWorks[0])
       }
     }
-  }, [externalWorks, currentWork, setCurrentWork])
+  }, [externalWorks, currentWork, selectWork])
 
   // 同步外部loading状态
   useEffect(() => {
@@ -242,7 +242,7 @@ export function FloatWindowNew({
   const handleWorkChange = async (workId: number) => {
     const work = works.find(w => w.id === workId)
     if (work) {
-      setCurrentWork(work)
+      selectWork(work)
       callbacks?.onWorkChange?.(workId)
     }
   }
