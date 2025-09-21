@@ -15,7 +15,8 @@
       "Bash(npx vite build:*)",
       "Bash(cargo check:*)",
       "Bash(cargo:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npm run type-check:*)"
     ],
     "deny": [],
     "ask": []

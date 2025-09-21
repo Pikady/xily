@@ -32,9 +32,13 @@ pub fn init_database() -> Result<()> {
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             target_hours INTEGER DEFAULT 0,
-            is_archived BOOLEAN DEFAULT FALSE
+            is_archived BOOLEAN DEFAULT FALSE,
+            ai_created BOOLEAN DEFAULT FALSE,
+            ai_session_id TEXT,
+            motivation_summary TEXT,
+            extracted_confidence INTEGER DEFAULT 0
         );
-        
+
         CREATE TABLE IF NOT EXISTS time_records (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             work_id INTEGER,
@@ -46,20 +50,60 @@ pub fn init_database() -> Result<()> {
             notes TEXT,
             FOREIGN KEY (work_id) REFERENCES works(id)
         );
-        
+
         CREATE TABLE IF NOT EXISTS user_settings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             key TEXT NOT NULL UNIQUE,
             value TEXT NOT NULL,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
-        
+
         CREATE TABLE IF NOT EXISTS system_state (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             key TEXT NOT NULL UNIQUE,
             value TEXT NOT NULL,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
+
+        CREATE TABLE IF NOT EXISTS ai_conversations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL,
+            role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
+            content TEXT NOT NULL,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            metadata TEXT -- JSON格式存储元数据
+        );
+
+        CREATE TABLE IF NOT EXISTS ai_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT UNIQUE NOT NULL,
+            user_id TEXT,
+            current_stage TEXT NOT NULL DEFAULT 'greeting',
+            status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed', 'cancelled')),
+            context TEXT, -- JSON格式存储上下文
+            message_count INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS motivation_commitments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            work_id INTEGER NOT NULL,
+            wish TEXT,
+            outcome TEXT,
+            obstacle TEXT,
+            plan TEXT,
+            implementation_intention TEXT,
+            commitment_statement TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (work_id) REFERENCES works(id) ON DELETE CASCADE
+        );
+
+        -- 创建索引
+        CREATE INDEX IF NOT EXISTS idx_ai_conversations_session_id ON ai_conversations(session_id);
+        CREATE INDEX IF NOT EXISTS idx_ai_sessions_session_id ON ai_sessions(session_id);
+        CREATE INDEX IF NOT EXISTS idx_ai_sessions_status ON ai_sessions(status);
+        CREATE INDEX IF NOT EXISTS idx_motivation_commitments_work_id ON motivation_commitments(work_id);
         "
     )?;
     

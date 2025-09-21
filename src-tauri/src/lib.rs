@@ -10,6 +10,7 @@ use services::tray::create_tray;
 use services::get_tray_manager;
 use models::{Work, TimerSession, TimerConfig, TimeRecord};
 use commands::*;
+use commands::ai_work::*;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -36,6 +37,13 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            // AI工作创建
+            start_ai_session,
+            send_ai_message,
+            extract_work_information,
+            generate_motivation_strategies,
+            create_work_from_ai,
+
             // 作品管理
             create_work,
             get_works,
@@ -44,7 +52,7 @@ pub fn run() {
             delete_work,
             archive_work,
             unarchive_work,
-            
+
             // 计时器
             start_timer,
             stop_timer,
@@ -53,7 +61,7 @@ pub fn run() {
             get_timer_config,
             save_timer_config,
             get_timer_sessions,
-            
+
             // 数据分析
             get_work_time_distribution,
             get_mode_distribution,
@@ -62,7 +70,7 @@ pub fn run() {
             get_work_stats,
             get_productivity_trends,
             export_data,
-            
+
             // 窗口管理
             show_main_window,
             hide_main_window,
@@ -75,13 +83,13 @@ pub fn run() {
             get_float_window_position,
             is_float_window_visible,
             is_main_window_visible,
-            
+
             // 系统命令
             get_app_version,
             get_app_name,
             quit_app,
             show_notification,
-            
+
             // 系统托盘
             show_tray,
             hide_tray,

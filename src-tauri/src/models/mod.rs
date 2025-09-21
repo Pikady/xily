@@ -13,6 +13,14 @@ pub struct Work {
     pub is_archived: bool,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateWorkParams {
+    pub name: String,
+    pub description: Option<String>,
+    pub color: Option<String>,
+    pub target_hours: f64,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TimeRecord {
     pub id: Option<i64>,
