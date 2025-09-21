@@ -32,6 +32,7 @@ export function AIWorkCreatorDialog({
     error,
     quickReplies,
     startSession,
+    resumeSession,
     sendMessage,
     updateExtractedWork,
     updateMotivationData,
@@ -50,12 +51,23 @@ export function AIWorkCreatorDialog({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
-  // 开始新会话
+  // 开始或恢复会话
   useEffect(() => {
     if (open && !currentSession) {
-      startSession();
+      // 如果有消息历史，尝试恢复会话
+      if (messages.length > 0) {
+        // 从Zustand store中获取最后一个会话ID
+        const lastMessage = messages[messages.length - 1];
+        if (lastMessage && lastMessage.session_id) {
+          resumeSession(lastMessage.session_id);
+        } else {
+          startSession();
+        }
+      } else {
+        startSession();
+      }
     }
-  }, [open, currentSession, startSession]);
+  }, [open, currentSession, startSession, resumeSession, messages]);
 
   // 重置状态当对话框关闭
   useEffect(() => {

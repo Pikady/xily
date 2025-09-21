@@ -105,9 +105,16 @@ export class ConversationManager {
     const startTime = Date.now();
 
     // 获取会话信息
-    const sessionData = this.sessionCache.get(sessionId);
+    let sessionData = this.sessionCache.get(sessionId);
     if (!sessionData) {
-      throw new Error('会话不存在或已过期');
+      // 如果会话不存在，自动创建新会话
+      console.log(`会话 ${sessionId} 不存在，自动创建新会话`);
+      const newSession = await this.startSession();
+      sessionData = this.sessionCache.get(newSession.session_id);
+
+      if (!sessionData) {
+        throw new Error('无法创建新会话');
+      }
     }
 
     const { session, messages, context } = sessionData;

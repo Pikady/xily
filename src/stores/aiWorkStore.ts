@@ -16,6 +16,7 @@ import { getQuickRepliesForStage } from '@/services/promptTemplates';
 interface AIWorkStore extends AIWorkCreatorState {
   // Actions
   startSession: () => Promise<void>;
+  resumeSession: (sessionId: string) => Promise<void>;
   sendMessage: (message: string) => Promise<void>;
   setStage: (stage: DialogueStage) => void;
   setExtractedWork: (data: ExtractedWorkData) => void;
@@ -68,6 +69,29 @@ export const useAIWorkStore = create<AIWorkStore>()(
           }
         },
 
+        // 恢复会话
+        resumeSession: async (sessionId: string) => {
+          try {
+            set({ isProcessing: true, error: null });
+
+            const session = await aiWorkService.resumeSession(sessionId);
+
+            set({
+              currentSession: session,
+              isProcessing: false,
+              quickReplies: getQuickRepliesForStage(session.current_stage).map(text => ({ id: Date.now().toString() + Math.random(), text }))
+            });
+
+            console.log('AI session resumed:', session.session_id);
+          } catch (error) {
+            console.error('Failed to resume AI session:', error);
+            set({
+              error: error instanceof Error ? { code: 'RESUME_ERROR', message: error.message, retryable: true, timestamp: new Date() } : { code: 'RESUME_ERROR', message: '恢复会话失败', retryable: true, timestamp: new Date() },
+              isProcessing: false
+            });
+          }
+        },
+
         sendMessage: async (message: string) => {
           const state = get();
           if (!state.currentSession || state.isProcessing) return;
@@ -105,10 +129,21 @@ export const useAIWorkStore = create<AIWorkStore>()(
               context
             );
 
+            // 检查是否创建了新的会话
+            let currentSessionId = state.currentSession.session_id;
+            if (response.metadata?.new_session_id) {
+              // 如果创建了新会话，更新当前会话
+              currentSessionId = response.metadata.new_session_id;
+              const newSession = await aiWorkService.resumeSession(currentSessionId);
+              set({
+                currentSession: newSession
+              });
+            }
+
             // 添加AI响应
             const aiMessage: ChatMessage = {
               id: (Date.now() + 1).toString(),
-              session_id: state.currentSession.session_id,
+              session_id: currentSessionId,
               role: 'assistant',
               content: response.message,
               created_at: new Date().toISOString(),

@@ -59,6 +59,47 @@ export class AIWorkService {
     }
   }
 
+  // 恢复现有会话
+  async resumeSession(sessionId: string): Promise<AISession> {
+    try {
+      if (this.useRealAI) {
+        // 尝试从缓存中获取会话
+        const sessionData = conversationManager.getSession(sessionId);
+        if (sessionData) {
+          return sessionData.session;
+        }
+
+        // 如果缓存中没有，创建新会话
+        const session = await conversationManager.startSession();
+        return session;
+      } else {
+        // 模拟模式下，返回一个模拟的会话对象
+        const mockSession: AISession = {
+          id: Date.now(),
+          session_id: sessionId,
+          user_id: 'user',
+          current_stage: 'greeting',
+          status: 'active',
+          context: {
+            user_preferences: {},
+            conversation_history: [],
+            temporary_data: {
+              ideas: [],
+              keywords: [],
+              emotions: []
+            }
+          },
+          message_count: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        return mockSession;
+      }
+    } catch (error) {
+      throw this.handleError(error, 'resumeSession');
+    }
+  }
+
   // 发送消息并获取AI响应
   async sendMessage(
     sessionId: string,
@@ -67,7 +108,26 @@ export class AIWorkService {
   ): Promise<AIResponse> {
     try {
       if (this.useRealAI) {
-        // 使用真实的AI服务
+        // 首先检查会话是否存在
+        let sessionData = conversationManager.getSession(sessionId);
+        let isNewSession = false;
+
+        if (!sessionData) {
+          // 如果会话不存在，重新创建会话
+          console.log(`会话 ${sessionId} 不存在，重新创建会话`);
+          const newSession = await conversationManager.startSession();
+          sessionData = conversationManager.getSession(newSession.session_id);
+
+          if (!sessionData) {
+            throw new Error('无法创建新会话');
+          }
+
+          // 使用新会话ID
+          sessionId = newSession.session_id;
+          isNewSession = true;
+        }
+
+        // 发送消息
         const result: ConversationResult = await conversationManager.sendMessage(sessionId, message);
 
         // 转换为AIResponse格式
@@ -83,6 +143,7 @@ export class AIWorkService {
           metadata: {
             processing_time: result.metadata?.processingTime,
             model: result.metadata?.model,
+            new_session_id: isNewSession ? sessionId : undefined
           }
         };
       } else {

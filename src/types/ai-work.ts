@@ -113,6 +113,7 @@ export interface AIResponse {
   metadata?: {
     processing_time?: number;
     model?: string;
+    new_session_id?: string;
   };
 }
 
