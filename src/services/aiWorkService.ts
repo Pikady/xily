@@ -153,10 +153,6 @@ export class AIWorkService {
       errors.push('目标时间应在0.5-1000小时之间');
     }
 
-    if (data.confidence < 0.5) {
-      errors.push('AI提取的置信度较低，建议手动调整');
-    }
-
     return {
       isValid: errors.length === 0,
       errors

@@ -92,11 +92,10 @@ export const PROMPT_TEMPLATES = {
 - 信息提取要准确完整
 - 保持对用户原意的尊重
 - 提供有价值的建议和优化
-- 评估提取信息的置信度`,
+- 提取完整准确的作品信息`,
       context: `当前阶段：信息收集和结构化
 需要提取：作品名称、描述、目标时间、颜色偏好
-提取原则：准确、完整、符合用户意图
-质量标准：置信度>0.8可认为是高质量提取`,
+提取原则：准确、完整、符合用户意图`,
       output_format: `{
   "message": "信息收集的回复",
   "stage": "motivation",
@@ -105,7 +104,6 @@ export const PROMPT_TEMPLATES = {
     "description": "作品描述",
     "target_hours": 目标小时数,
     "color": "推荐颜色",
-    "confidence": 置信度0-1,
     "suggestions": {
       "name_alternatives": ["备选名称1", "备选名称2"],
       "color_recommendations": ["#3498db", "#e67e22"]
@@ -286,13 +284,7 @@ export const PROMPT_TEMPLATES = {
 
 如果理解有误，请用不同的方式重新告诉我，我会仔细倾听。`,
 
-    confidence_low: `我注意到我对一些信息的理解可能不够准确。为了确保我为你提供最适合的建议，能否请你：
-
-1. 重新确认一下最重要的几点信息
-2. 或者用更具体的方式描述你的想法
-
-这样我就能更好地帮助你规划创作项目了。`
-  }
+      }
 };
 
 // 阶段转换规则
@@ -307,7 +299,7 @@ export const STAGE_TRANSITION_RULES = {
   },
 
   information_to_motivation: (extractedData: ExtractedWorkData) => {
-    return extractedData && extractedData.confidence > 0.6;
+    return extractedData && extractedData.name && extractedData.target_hours > 0;
   },
 
   motivation_to_confirmation: (motivationData: MotivationData) => {

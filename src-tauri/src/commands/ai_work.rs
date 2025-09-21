@@ -34,7 +34,6 @@ pub struct ExtractedWorkData {
     pub description: Option<String>,
     pub target_hours: f64,
     pub color: Option<String>,
-    pub confidence: f64,
     pub suggestions: Option<WorkSuggestions>,
 }
 
@@ -103,7 +102,6 @@ pub async fn send_ai_message(
                 description: Some("一个有意义的创作项目".to_string()),
                 target_hours: 40.0,
                 color: Some("#3498db".to_string()),
-                confidence: 0.6,
                 suggestions: Some(WorkSuggestions {
                     name_alternatives: Some(vec![
                         "创意项目".to_string(),
@@ -123,7 +121,7 @@ pub async fn send_ai_message(
                     "我想写一本自助书籍".to_string(),
                 ]),
             }),
-            metadata: serde_json::json!({"confidence": 0.9}),
+            metadata: serde_json::json!({}),
         }
     } else if message.contains("应用") || message.contains("开发") {
         AIResponse {
@@ -134,7 +132,6 @@ pub async fn send_ai_message(
                 description: Some("一个有用的应用程序".to_string()),
                 target_hours: 60.0,
                 color: Some("#e67e22".to_string()),
-                confidence: 0.6,
                 suggestions: Some(WorkSuggestions {
                     name_alternatives: Some(vec![
                         "创新应用".to_string(),
@@ -154,7 +151,7 @@ pub async fn send_ai_message(
                     "这是一个桌面应用".to_string(),
                 ]),
             }),
-            metadata: serde_json::json!({"confidence": 0.9}),
+            metadata: serde_json::json!({}),
         }
     } else if message.contains("学习") || message.contains("技能") {
         AIResponse {
@@ -165,7 +162,6 @@ pub async fn send_ai_message(
                 description: Some("一个有意义的学习项目".to_string()),
                 target_hours: 30.0,
                 color: Some("#2ecc71".to_string()),
-                confidence: 0.6,
                 suggestions: Some(WorkSuggestions {
                     name_alternatives: Some(vec![
                         "技能提升".to_string(),
@@ -185,7 +181,7 @@ pub async fn send_ai_message(
                     "我想学习语言".to_string(),
                 ]),
             }),
-            metadata: serde_json::json!({"confidence": 0.9}),
+            metadata: serde_json::json!({}),
         }
     } else if message.contains("小说") {
         AIResponse {
@@ -196,7 +192,6 @@ pub async fn send_ai_message(
                 description: Some("一部充满想象力的小说作品".to_string()),
                 target_hours: 80.0,
                 color: Some("#9b59b6".to_string()),
-                confidence: 0.85,
                 suggestions: Some(WorkSuggestions {
                     name_alternatives: Some(vec![
                         "梦想之书".to_string(),
@@ -218,7 +213,7 @@ pub async fn send_ai_message(
                     "继续动机分析".to_string(),
                 ]),
             }),
-            metadata: serde_json::json!({"confidence": 0.85}),
+            metadata: serde_json::json!({}),
         }
     } else if message.contains("不错") || message.contains("很好") {
         AIResponse {
@@ -229,7 +224,6 @@ pub async fn send_ai_message(
                 description: Some("一个有意义的创作项目".to_string()),
                 target_hours: 50.0,
                 color: Some("#9b59b6".to_string()),
-                confidence: 0.8,
                 suggestions: Some(WorkSuggestions {
                     name_alternatives: Some(vec![
                         "创意项目".to_string(),
@@ -267,7 +261,7 @@ pub async fn send_ai_message(
                     "确认创建".to_string(),
                 ]),
             }),
-            metadata: serde_json::json!({"confidence": 0.9}),
+            metadata: serde_json::json!({}),
         }
     } else if message.contains("确认") {
         AIResponse {
@@ -278,7 +272,6 @@ pub async fn send_ai_message(
                 description: Some("一个有意义的创作项目，值得投入时间和精力".to_string()),
                 target_hours: 50.0,
                 color: Some("#9b59b6".to_string()),
-                confidence: 0.95,
                 suggestions: Some(WorkSuggestions {
                     name_alternatives: Some(vec![
                         "创意项目".to_string(),
@@ -316,7 +309,7 @@ pub async fn send_ai_message(
                     "重新开始".to_string(),
                 ]),
             }),
-            metadata: serde_json::json!({"confidence": 0.95}),
+            metadata: serde_json::json!({}),
         }
     } else {
         // 默认响应
@@ -328,7 +321,6 @@ pub async fn send_ai_message(
                 description: Some("一个有趣且有意义的创作项目".to_string()),
                 target_hours: 40.0,
                 color: Some("#3498db".to_string()),
-                confidence: 0.5,
                 suggestions: Some(WorkSuggestions {
                     name_alternatives: Some(vec![
                         "创意项目".to_string(),
@@ -348,7 +340,7 @@ pub async fn send_ai_message(
                     "我想学习新知识".to_string(),
                 ]),
             }),
-            metadata: serde_json::json!({"confidence": 0.8}),
+            metadata: serde_json::json!({}),
         }
     };
 
@@ -367,7 +359,6 @@ pub async fn extract_work_information(
         description: Some("一个有意义的创作项目".to_string()),
         target_hours: 40.0,
         color: Some("#3498db".to_string()),
-        confidence: 0.8,
         suggestions: Some(WorkSuggestions {
             name_alternatives: Some(vec![
                 "创意项目".to_string(),

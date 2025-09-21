@@ -12,7 +12,6 @@ export interface ChatMessage extends TimestampEntity {
   metadata?: {
     type?: 'text' | 'quick_reply' | 'system';
     stage?: string;
-    confidence?: number;
     extracted_data?: any;
     quick_replies?: string[];
   };
@@ -59,7 +58,6 @@ export interface ExtractedWorkData {
   description?: string;
   target_hours: number;
   color?: string;
-  confidence: number; // AI对提取数据的置信度 0-1
   extraction_notes?: string;
   suggestions?: {
     name_alternatives?: string[];
@@ -114,7 +112,6 @@ export interface AIResponse {
   };
   metadata?: {
     processing_time?: number;
-    confidence?: number;
     model?: string;
   };
 }

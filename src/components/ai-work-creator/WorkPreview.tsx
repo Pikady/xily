@@ -60,23 +60,13 @@ export function WorkPreview({ data, onEdit, isValid = true }: WorkPreviewProps) 
     setTempValues({ ...tempValues, [field]: data[field as keyof ExtractedWorkData] });
   };
 
-  const renderConfidence = () => {
-    if (data.confidence >= 0.8) {
-      return <Badge variant="default" className="bg-green-500">高置信度</Badge>;
-    } else if (data.confidence >= 0.6) {
-      return <Badge variant="secondary">中等置信度</Badge>;
-    } else {
-      return <Badge variant="destructive">低置信度</Badge>;
-    }
-  };
-
+  
   return (
     <Card className="w-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Target className="h-5 w-5" />
           作品预览
-          {renderConfidence()}
         </CardTitle>
       </CardHeader>
 
