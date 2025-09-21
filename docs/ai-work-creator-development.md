@@ -83,7 +83,6 @@ export interface ChatMessage {
   metadata?: {
     type?: 'text' | 'quick_reply' | 'system';
     stage?: string;
-    confidence?: number;
   };
 }
 
@@ -102,7 +101,6 @@ export interface ExtractedWorkData {
   description?: string;
   target_hours: number;
   color?: string;
-  confidence: number;
   suggestions?: {
     name_alternatives?: string[];
     color_recommendations?: string[];
@@ -286,7 +284,6 @@ export const useAIWorkStore = create<AIWorkState>()(
               timestamp: new Date(),
               metadata: {
                 stage: response.stage,
-                confidence: response.metadata?.confidence
               }
             };
 
@@ -397,7 +394,6 @@ export const PROMPT_TEMPLATES = {
           "description": "作品描述",
           "target_hours": 目标小时数,
           "color": "推荐颜色",
-          "confidence": 置信度0-1,
           "suggestions": {
             "name_alternatives": ["备选名称1", "备选名称2"],
             "color_recommendations": ["#3498db", "#e67e22"]
@@ -820,13 +816,6 @@ export function ChatMessage({ message, onQuickReply }: ChatMessageProps) {
           </div>
         )}
 
-        {/* 置信度指示器 */}
-        {message.metadata?.confidence && (
-          <div className="mt-2 flex items-center gap-1 text-xs opacity-70">
-            <CheckCircle className="h-3 w-3" />
-            置信度: {Math.round(message.metadata.confidence * 100)}%
-          </div>
-        )}
       </div>
 
       {isUser && (
@@ -955,7 +944,6 @@ pub async fn send_ai_message(
         timestamp: Utc::now(),
         metadata: Some(json!({
             "stage": response.stage,
-            "confidence": response.metadata.get("confidence")
         })),
     };
 
@@ -1370,7 +1358,6 @@ CREATE TABLE IF NOT EXISTS motivation_commitments (
 ALTER TABLE works ADD COLUMN ai_created BOOLEAN DEFAULT FALSE;
 ALTER TABLE works ADD COLUMN ai_session_id TEXT;
 ALTER TABLE works ADD COLUMN motivation_summary TEXT;
-ALTER TABLE works ADD COLUMN extracted_confidence INTEGER DEFAULT 0;
 
 -- 创建索引
 CREATE INDEX IF NOT EXISTS idx_ai_conversations_session_id ON ai_conversations(session_id);

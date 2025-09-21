@@ -10,17 +10,28 @@ import {
   QuickReplyOption,
   AIError
 } from '@/types/ai-work';
+import {
+  conversationManager,
+  AIServiceStatus,
+  type ConversationResult,
+  type AIServiceInfo
+} from './ai';
 
 export class AIWorkService {
   private static instance: AIWorkService;
-  private apiKey: string;
+  private useRealAI: boolean = false; // 控制是否使用真实AI
+  private serviceStatus: AIServiceStatus = AIServiceStatus.DISABLED;
 
   private constructor() {
-    // 从环境变量获取API密钥
-    this.apiKey = (import.meta as any).env.VITE_AI_API_KEY || '';
+    // 检查是否配置了真实的AI API
+    const deepseekApiKey = import.meta.env.VITE_DEEPSEEK_API_KEY;
 
-    if (!this.apiKey) {
-      console.warn('AI API key not found. Please set VITE_AI_API_KEY environment variable.');
+    if (deepseekApiKey) {
+      this.useRealAI = true;
+      this.serviceStatus = AIServiceStatus.ENABLED;
+      console.log('真实AI服务已启用 (DeepSeek)');
+    } else {
+      console.warn('AI API密钥未配置，使用模拟模式。设置 VITE_DEEPSEEK_API_KEY 环境变量以启用真实AI。');
     }
   }
 
@@ -34,8 +45,15 @@ export class AIWorkService {
   // 开始新的AI会话
   async startSession(): Promise<AISession> {
     try {
-      const response = await invoke<AISession>('start_ai_session');
-      return response;
+      if (this.useRealAI) {
+        // 使用真实的AI服务
+        const session = await conversationManager.startSession();
+        return session;
+      } else {
+        // 使用模拟模式
+        const response = await invoke<AISession>('start_ai_session');
+        return response;
+      }
     } catch (error) {
       throw this.handleError(error, 'startSession');
     }
@@ -48,12 +66,34 @@ export class AIWorkService {
     context: any
   ): Promise<AIResponse> {
     try {
-      const response = await invoke<AIResponse>('send_ai_message', {
-        sessionId,
-        message,
-        context: JSON.stringify(context)
-      });
-      return response;
+      if (this.useRealAI) {
+        // 使用真实的AI服务
+        const result: ConversationResult = await conversationManager.sendMessage(sessionId, message);
+
+        // 转换为AIResponse格式
+        return {
+          message: result.message,
+          stage: result.stage,
+          extracted_data: result.extractedData,
+          motivation_data: result.motivationData,
+          suggestions: {
+            quick_replies: result.suggestions?.quickReplies,
+            actions: result.suggestions?.actions,
+          },
+          metadata: {
+            processing_time: result.metadata?.processingTime,
+            model: result.metadata?.model,
+          }
+        };
+      } else {
+        // 使用模拟模式
+        const response = await invoke<AIResponse>('send_ai_message', {
+          sessionId,
+          message,
+          context: JSON.stringify(context)
+        });
+        return response;
+      }
     } catch (error) {
       throw this.handleError(error, 'sendMessage');
     }
@@ -65,11 +105,23 @@ export class AIWorkService {
     conversationHistory: ChatMessage[]
   ): Promise<ExtractedWorkData> {
     try {
-      const response = await invoke<ExtractedWorkData>('extract_work_information', {
-        sessionId,
-        conversationHistory: JSON.stringify(conversationHistory)
-      });
-      return response;
+      if (this.useRealAI) {
+        // 使用真实的AI服务 - 从conversationManager获取会话数据
+        const sessionData = conversationManager.getSession(sessionId);
+        if (sessionData && sessionData.session.context.extracted_data) {
+          return sessionData.session.context.extracted_data;
+        }
+
+        // 如果没有提取的数据，抛出错误
+        throw new Error('未找到作品信息，请先进行对话');
+      } else {
+        // 使用模拟模式
+        const response = await invoke<ExtractedWorkData>('extract_work_information', {
+          sessionId,
+          conversationHistory: JSON.stringify(conversationHistory)
+        });
+        return response;
+      }
     } catch (error) {
       throw this.handleError(error, 'extractWorkInfo');
     }
@@ -81,11 +133,23 @@ export class AIWorkService {
     workInfo: string
   ): Promise<MotivationData> {
     try {
-      const response = await invoke<MotivationData>('generate_motivation_strategies', {
-        sessionId,
-        workInfo
-      });
-      return response;
+      if (this.useRealAI) {
+        // 使用真实的AI服务 - 从conversationManager获取会话数据
+        const sessionData = conversationManager.getSession(sessionId);
+        if (sessionData && sessionData.session.context.motivation_data) {
+          return sessionData.session.context.motivation_data;
+        }
+
+        // 如果没有动机数据，抛出错误
+        throw new Error('未找到动机策略，请先进行对话');
+      } else {
+        // 使用模拟模式
+        const response = await invoke<MotivationData>('generate_motivation_strategies', {
+          sessionId,
+          workInfo
+        });
+        return response;
+      }
     } catch (error) {
       throw this.handleError(error, 'generateMotivationStrategies');
     }
@@ -236,18 +300,110 @@ export class AIWorkService {
   // 检查API状态
   async checkAPIStatus(): Promise<{ available: boolean; message: string }> {
     try {
-      // 简单的健康检查
-      const testSession = await this.startSession();
-      return {
-        available: true,
-        message: 'AI服务正常'
-      };
+      if (this.useRealAI) {
+        // 使用真实的AI服务检查
+        const status = await conversationManager.checkAvailability();
+        return {
+          available: status.available,
+          message: status.message
+        };
+      } else {
+        // 简单的健康检查
+        const testSession = await this.startSession();
+        return {
+          available: true,
+          message: 'AI服务正常（模拟模式）'
+        };
+      }
     } catch (error) {
       return {
         available: false,
         message: `AI服务不可用: ${error instanceof Error ? error.message : '未知错误'}`
       };
     }
+  }
+
+  // 获取AI服务信息
+  async getServiceInfo(): Promise<AIServiceInfo> {
+    if (this.useRealAI) {
+      const status = await conversationManager.checkAvailability();
+      return {
+        status: status.available ? AIServiceStatus.ENABLED : AIServiceStatus.ERROR,
+        provider: 'deepseek',
+        model: 'deepseek-chat',
+        configured: true,
+        lastCheck: new Date(),
+        error: status.available ? undefined : status.message
+      };
+    } else {
+      return {
+        status: AIServiceStatus.DISABLED,
+        provider: 'deepseek',
+        model: 'mock-model',
+        configured: false,
+        lastCheck: new Date(),
+        error: 'API密钥未配置'
+      };
+    }
+  }
+
+  // 更新会话数据
+  async updateSessionData(
+    sessionId: string,
+    data: {
+      extractedData?: ExtractedWorkData;
+      motivationData?: MotivationData;
+    }
+  ): Promise<boolean> {
+    if (this.useRealAI) {
+      return conversationManager.updateSessionData(sessionId, data);
+    } else {
+      // 模拟模式下直接返回成功
+      return true;
+    }
+  }
+
+  // 结束会话
+  async endSession(sessionId: string): Promise<boolean> {
+    if (this.useRealAI) {
+      return conversationManager.endSession(sessionId);
+    } else {
+      try {
+        await invoke('end_ai_session', { sessionId });
+        return true;
+      } catch (error) {
+        console.error('结束会话失败:', error);
+        return false;
+      }
+    }
+  }
+
+  // 清理会话
+  async clearSession(sessionId: string): Promise<void> {
+    if (this.useRealAI) {
+      conversationManager.clearSession(sessionId);
+    }
+    // 模拟模式不需要清理
+  }
+
+  // 获取会话信息
+  async getSession(sessionId: string): Promise<{ session: AISession; messages: ChatMessage[] } | null> {
+    if (this.useRealAI) {
+      return conversationManager.getSession(sessionId);
+    } else {
+      // 模拟模式返回null，由前端自己管理
+      return null;
+    }
+  }
+
+  // 检查是否使用真实AI
+  isUsingRealAI(): boolean {
+    return this.useRealAI;
+  }
+
+  // 获取服务状态
+  getServiceStatus(): AIServiceStatus {
+    return this.serviceStatus;
   }
 
   // 清理资源

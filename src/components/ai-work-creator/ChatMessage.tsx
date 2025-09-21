@@ -71,13 +71,6 @@ export function ChatMessage({ message, onQuickReply }: ChatMessageProps) {
           </div>
         )}
 
-        {/* 置信度指示器 */}
-        {message.metadata?.confidence && (
-          <div className="mt-2 flex items-center gap-1 text-xs opacity-70">
-            <CheckCircle className="h-3 w-3" />
-            置信度: {Math.round(message.metadata.confidence * 100)}%
-          </div>
-        )}
       </div>
 
       {isUser && (

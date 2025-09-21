@@ -115,7 +115,6 @@ export const useAIWorkStore = create<AIWorkStore>()(
               updated_at: new Date().toISOString(),
               metadata: {
                 stage: response.stage,
-                confidence: response.metadata?.confidence,
                 quick_replies: response.suggestions?.quick_replies
               }
             };
@@ -322,9 +321,6 @@ export function useDataValidation() {
       errors.push('目标时间应在0.5-1000小时之间');
     }
 
-    if (extractedWork.confidence < 0.5) {
-      errors.push('AI提取的置信度较低，建议手动调整');
-    }
 
     return {
       isValid: errors.length === 0,

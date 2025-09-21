@@ -35,8 +35,7 @@ pub fn init_database() -> Result<()> {
             is_archived BOOLEAN DEFAULT FALSE,
             ai_created BOOLEAN DEFAULT FALSE,
             ai_session_id TEXT,
-            motivation_summary TEXT,
-            extracted_confidence INTEGER DEFAULT 0
+            motivation_summary TEXT
         );
 
         CREATE TABLE IF NOT EXISTS time_records (

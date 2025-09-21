@@ -202,3 +202,21 @@ export interface AIWorkCreatorState {
   error: AIError | null;
   quickReplies: QuickReplyOption[];
 }
+
+// AI服务状态
+export enum AIServiceStatus {
+  DISABLED = 'disabled',
+  ENABLED = 'enabled',
+  ERROR = 'error',
+  RATE_LIMITED = 'rate_limited',
+}
+
+// AI服务信息
+export interface AIServiceInfo {
+  status: AIServiceStatus;
+  provider: 'deepseek' | 'openai' | 'mock' | 'other';
+  model: string;
+  configured: boolean;
+  lastCheck?: Date;
+  error?: string;
+}
