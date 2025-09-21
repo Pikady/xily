@@ -45,7 +45,7 @@ export class ConversationManager {
       maxHistoryLength: config?.maxHistoryLength ?? 50,
       enableAutoExtraction: config?.enableAutoExtraction ?? true,
       enableStageTransition: config?.enableStageTransition ?? true,
-      streamResponse: config?.streamResponse ?? false,
+      streamResponse: config?.streamResponse ?? true,
     };
   }
 
@@ -100,6 +100,7 @@ export class ConversationManager {
       metadata?: Record<string, any>;
       forceStage?: DialogueStage;
       skipExtraction?: boolean;
+      onStream?: (content: string) => void;
     }
   ): Promise<ConversationResult> {
     const startTime = Date.now();
@@ -146,14 +147,15 @@ export class ConversationManager {
       const aiMessages = PromptBuilder.buildMessages(context);
 
       // 发送请求到AI
-      let aiResponseContent: string;
+      let aiResponseContent: string = '';
       let tokensUsed = 0;
 
-      if (this.config.streamResponse) {
-        // 流式响应（暂不实现，保留接口）
-        const response = await deepSeekClient.chat(aiMessages);
-        aiResponseContent = response.choices[0].message.content;
-        tokensUsed = response.usage.total_tokens;
+      if (this.config.streamResponse && options?.onStream) {
+        // 流式响应
+        for await (const chunk of deepSeekClient.chatStream(aiMessages)) {
+          aiResponseContent += chunk;
+          options.onStream(aiResponseContent);
+        }
       } else {
         // 普通响应
         const response = await deepSeekClient.chat(aiMessages);
@@ -214,11 +216,8 @@ export class ConversationManager {
         }
       }
 
-      // 生成快捷回复建议
-      const quickReplies = PromptBuilder.buildQuickReplySuggestions(
-        session.current_stage,
-        content
-      );
+      // 生成快捷回复建议（已禁用）
+      const quickReplies: string[] = [];
 
       // 更新会话时间
       session.updated_at = new Date().toISOString();

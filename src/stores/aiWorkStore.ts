@@ -6,12 +6,10 @@ import {
   DialogueStage,
   ExtractedWorkData,
   MotivationData,
-  QuickReplyOption,
   AIError,
   AIWorkCreatorState
 } from '@/types/ai-work';
 import { aiWorkService } from '@/services/aiWorkService';
-import { getQuickRepliesForStage } from '@/services/promptTemplates';
 
 interface AIWorkStore extends AIWorkCreatorState {
   // Actions
@@ -42,7 +40,6 @@ export const useAIWorkStore = create<AIWorkStore>()(
         extractedWork: null,
         motivationData: null,
         error: null,
-        quickReplies: [],
 
         // Actions
         startSession: async () => {
@@ -55,8 +52,7 @@ export const useAIWorkStore = create<AIWorkStore>()(
               currentSession: session,
               messages: [],
               currentStage: 'greeting',
-              isProcessing: false,
-              quickReplies: getQuickRepliesForStage('greeting').map(text => ({ id: Date.now().toString() + Math.random(), text }))
+              isProcessing: false
             });
 
             console.log('AI session started:', session.session_id);
@@ -78,8 +74,7 @@ export const useAIWorkStore = create<AIWorkStore>()(
 
             set({
               currentSession: session,
-              isProcessing: false,
-              quickReplies: getQuickRepliesForStage(session.current_stage).map(text => ({ id: Date.now().toString() + Math.random(), text }))
+              isProcessing: false
             });
 
             console.log('AI session resumed:', session.session_id);
@@ -107,11 +102,23 @@ export const useAIWorkStore = create<AIWorkStore>()(
               updated_at: new Date().toISOString()
             };
 
+            // 创建临时的AI消息用于流式显示
+            const tempAiMessage: ChatMessage = {
+              id: (Date.now() + 1).toString(),
+              session_id: state.currentSession.session_id,
+              role: 'assistant',
+              content: '',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              metadata: {
+                stage: state.currentStage,
+              }
+            };
+
             set({
-              messages: [...state.messages, userMessage],
+              messages: [...state.messages, userMessage, tempAiMessage],
               isTyping: true,
-              isProcessing: true,
-              quickReplies: []
+              isProcessing: true
             });
 
             // 构建上下文
@@ -122,11 +129,25 @@ export const useAIWorkStore = create<AIWorkStore>()(
               motivationData: state.motivationData
             };
 
-            // 调用AI服务
+            // 调用AI服务，支持流式响应
             const response = await aiWorkService.sendMessage(
               state.currentSession.session_id,
               message,
-              context
+              context,
+              // 流式回调函数
+              (streamContent: string) => {
+                set((state) => ({
+                  messages: state.messages.map(msg =>
+                    msg.id === tempAiMessage.id
+                      ? { ...msg, content: streamContent, updated_at: new Date().toISOString() }
+                      : msg
+                  )
+                }));
+                // 一旦开始流式响应，就隐藏输入指示器
+                if (streamContent.length > 0) {
+                  set({ isTyping: false });
+                }
+              }
             );
 
             // 检查是否创建了新的会话
@@ -140,28 +161,26 @@ export const useAIWorkStore = create<AIWorkStore>()(
               });
             }
 
-            // 添加AI响应
-            const aiMessage: ChatMessage = {
-              id: (Date.now() + 1).toString(),
+            // 更新AI响应的最终内容
+            const finalAiMessage: ChatMessage = {
+              id: tempAiMessage.id,
               session_id: currentSessionId,
               role: 'assistant',
               content: response.message,
-              created_at: new Date().toISOString(),
+              created_at: tempAiMessage.created_at,
               updated_at: new Date().toISOString(),
               metadata: {
-                stage: response.stage,
-                quick_replies: response.suggestions?.quick_replies
+                stage: response.stage
               }
             };
 
-            const updatedMessages = [...state.messages, userMessage, aiMessage];
+            const updatedMessages = [...state.messages, userMessage, finalAiMessage];
 
             set({
               messages: updatedMessages,
               isTyping: false,
               isProcessing: false,
-              currentStage: response.stage || state.currentStage,
-              quickReplies: (response.suggestions?.quick_replies || getQuickRepliesForStage(response.stage || state.currentStage)).map(text => ({ id: Date.now().toString() + Math.random(), text }))
+              currentStage: response.stage || state.currentStage
             });
 
             // 处理提取的数据
@@ -190,8 +209,7 @@ export const useAIWorkStore = create<AIWorkStore>()(
 
         setStage: (stage: DialogueStage) => {
           set({
-            currentStage: stage,
-            quickReplies: getQuickRepliesForStage(stage).map(text => ({ id: Date.now().toString() + Math.random(), text }))
+            currentStage: stage
           });
         },
 
@@ -240,8 +258,7 @@ export const useAIWorkStore = create<AIWorkStore>()(
             currentStage: 'greeting',
             extractedWork: null,
             motivationData: null,
-            error: null,
-            quickReplies: []
+            error: null
           });
         },
 
@@ -287,8 +304,7 @@ export const selectAIWorkState = (state: AIWorkStore) => ({
   currentStage: state.currentStage,
   extractedWork: state.extractedWork,
   motivationData: state.motivationData,
-  error: state.error,
-  quickReplies: state.quickReplies
+  error: state.error
 });
 
 export const selectAIWorkActions = (state: AIWorkStore) => ({

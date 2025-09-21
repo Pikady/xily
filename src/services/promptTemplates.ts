@@ -360,38 +360,3 @@ ${conversationHistory}
 ${outputFormat}`;
 }
 
-// 获取快捷回复建议
-export function getQuickRepliesForStage(stage: DialogueStage): string[] {
-  const quickRepliesMap: Record<DialogueStage, string[]> = {
-    greeting: [
-      '我想写一本书',
-      '我想开发一个应用',
-      '我想学习新技能',
-      '我还不太确定'
-    ],
-    discovery: [
-      '详细说说你的想法',
-      '是什么激发了你的灵感？',
-      '你希望达到什么目标？',
-      '这对你很重要吗？'
-    ],
-    information_gathering: [
-      '我想调整一下',
-      '看起来不错',
-      '继续动机分析'
-    ],
-    motivation: [
-      '这个计划很好',
-      '我想修改承诺',
-      '确认创建'
-    ],
-    confirmation: [
-      '确认创建作品',
-      '调整信息',
-      '重新开始'
-    ],
-    completed: []
-  };
-
-  return quickRepliesMap[stage] || [];
-}

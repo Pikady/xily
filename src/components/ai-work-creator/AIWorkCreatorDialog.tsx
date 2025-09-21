@@ -8,7 +8,7 @@ import { WorkPreview } from './WorkPreview';
 import { MotivationSummary } from './MotivationSummary';
 import { useAIWorkStore, useDataValidation } from '@/stores/aiWorkStore';
 import { aiWorkService } from '@/services/aiWorkService';
-import { Brain, X, CheckCircle, RefreshCw, AlertCircle } from 'lucide-react';
+import { Brain, X, CheckCircle, RefreshCw, AlertCircle, Plus } from 'lucide-react';
 
 interface AIWorkCreatorDialogProps {
   open: boolean;
@@ -30,7 +30,6 @@ export function AIWorkCreatorDialog({
     extractedWork,
     motivationData,
     error,
-    quickReplies,
     startSession,
     resumeSession,
     sendMessage,
@@ -85,11 +84,7 @@ export function AIWorkCreatorDialog({
     }
   };
 
-  // 处理快捷回复
-  const handleQuickReply = (reply: string) => {
-    handleSend(reply);
-  };
-
+  
   // 处理作品信息编辑
   const handleWorkEdit = (field: string, value: any) => {
     updateExtractedWork(field, value);
@@ -141,8 +136,20 @@ export function AIWorkCreatorDialog({
 
   // 重置会话
   const handleReset = () => {
+    // 确认用户想要重置对话
+    if (messages.length > 0 && !confirm('确定要开始新对话吗？当前的对话内容将会被清除。')) {
+      return;
+    }
+
+    // 清理当前会话
+    if (currentSession) {
+      aiWorkService.clearSession(currentSession.session_id);
+    }
+
+    // 重置所有状态
     clearSession();
     startSession();
+    setInputMessage('');
   };
 
   // 重试上次操作
@@ -210,13 +217,26 @@ export function AIWorkCreatorDialog({
                     </div>
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => onOpenChange(false)}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-2">
+                  {/* 新对话按钮 */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleReset}
+                    disabled={isProcessing || isCreating}
+                    className="flex items-center gap-1"
+                  >
+                    <Plus className="h-4 w-4" />
+                    新对话
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onOpenChange(false)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -225,8 +245,6 @@ export function AIWorkCreatorDialog({
               <ChatContainer
                 messages={messages}
                 isTyping={isTyping}
-                onQuickReply={handleQuickReply}
-                quickReplies={quickReplies}
                 messagesEndRef={messagesEndRef}
               />
 
@@ -281,6 +299,21 @@ export function AIWorkCreatorDialog({
                   <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                     <p className="text-sm text-blue-700">
                       💡 提示：告诉我你的创作想法，我会帮你规划并制定完成计划！
+                    </p>
+                    <p className="text-sm text-blue-600 mt-1">
+                      🔄 点击右上角的"新对话"按钮可以随时重新开始对话。
+                    </p>
+                  </div>
+                )}
+
+                {/* 阶段提示 */}
+                {currentStage !== 'greeting' && messages.length > 0 && (
+                  <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p className="text-sm text-amber-700">
+                      📝 当前处于 <strong>{getStageTitle()}</strong> 阶段
+                    </p>
+                    <p className="text-sm text-amber-600 mt-1">
+                      🔄 需要重新开始？点击右上角的"新对话"按钮。
                     </p>
                   </div>
                 )}

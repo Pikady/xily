@@ -200,7 +200,6 @@ interface AIWorkState {
 
   // UI状态
   error: string | null;
-  quickReplies: QuickReplyOption[];
 
   // Actions
   startSession: () => Promise<void>;

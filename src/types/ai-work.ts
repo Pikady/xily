@@ -10,10 +10,9 @@ export interface ChatMessage extends TimestampEntity {
   role: ChatRole;
   content: string;
   metadata?: {
-    type?: 'text' | 'quick_reply' | 'system';
+    type?: 'text' | 'system';
     stage?: string;
     extracted_data?: any;
-    quick_replies?: string[];
   };
 }
 
@@ -107,7 +106,6 @@ export interface AIResponse {
   extracted_data?: ExtractedWorkData;
   motivation_data?: MotivationData;
   suggestions?: {
-    quick_replies?: string[];
     actions?: string[];
   };
   metadata?: {
@@ -125,13 +123,6 @@ export interface CreateWorkFromAIParams {
   session_id: string;
 }
 
-// 快捷回复选项
-export interface QuickReplyOption {
-  id: string;
-  text: string;
-  action?: 'send' | 'extract' | 'motivate' | 'confirm';
-  metadata?: any;
-}
 
 // AI服务配置
 export interface AIServiceConfig {
@@ -153,7 +144,6 @@ export interface DialogueTemplate {
     extracted_data?: boolean;
     motivation_data?: boolean;
   };
-  quick_replies?: QuickReplyOption[];
 }
 
 // AI错误类型
@@ -176,7 +166,6 @@ export interface AIWorkCreatorProps {
 export interface ChatMessageProps {
   message: ChatMessage;
   isTyping?: boolean;
-  onQuickReply?: (reply: string) => void;
 }
 
 export interface WorkPreviewProps {
@@ -201,7 +190,6 @@ export interface AIWorkCreatorState {
   extractedWork: ExtractedWorkData | null;
   motivationData: MotivationData | null;
   error: AIError | null;
-  quickReplies: QuickReplyOption[];
 }
 
 // AI服务状态

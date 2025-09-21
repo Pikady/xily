@@ -7,7 +7,6 @@ import {
   MotivationData,
   CreateWorkFromAIParams,
   DialogueStage,
-  QuickReplyOption,
   AIError
 } from '@/types/ai-work';
 import {
@@ -104,7 +103,8 @@ export class AIWorkService {
   async sendMessage(
     sessionId: string,
     message: string,
-    context: any
+    context: any,
+    onStream?: (content: string) => void
   ): Promise<AIResponse> {
     try {
       if (this.useRealAI) {
@@ -128,7 +128,9 @@ export class AIWorkService {
         }
 
         // 发送消息
-        const result: ConversationResult = await conversationManager.sendMessage(sessionId, message);
+        const result: ConversationResult = await conversationManager.sendMessage(sessionId, message, {
+          onStream
+        });
 
         // 转换为AIResponse格式
         return {
@@ -137,7 +139,6 @@ export class AIWorkService {
           extracted_data: result.extractedData,
           motivation_data: result.motivationData,
           suggestions: {
-            quick_replies: result.suggestions?.quickReplies,
             actions: result.suggestions?.actions,
           },
           metadata: {
@@ -226,42 +227,7 @@ export class AIWorkService {
     }
   }
 
-  // 获取快捷回复建议
-  getQuickRepliesForStage(stage: DialogueStage): QuickReplyOption[] {
-    const quickRepliesMap: Record<DialogueStage, QuickReplyOption[]> = {
-      greeting: [
-        { id: 'greeting-1', text: '我想写一本书', action: 'send' },
-        { id: 'greeting-2', text: '我想开发一个应用', action: 'send' },
-        { id: 'greeting-3', text: '我想学习新技能', action: 'send' },
-        { id: 'greeting-4', text: '我还不太确定', action: 'send' }
-      ],
-      discovery: [
-        { id: 'discovery-1', text: '详细说说你的想法', action: 'send' },
-        { id: 'discovery-2', text: '是什么激发了你的灵感？', action: 'send' },
-        { id: 'discovery-3', text: '你希望达到什么目标？', action: 'send' },
-        { id: 'discovery-4', text: '这对你很重要吗？', action: 'send' }
-      ],
-      information_gathering: [
-        { id: 'info-1', text: '我想调整一下', action: 'send' },
-        { id: 'info-2', text: '看起来不错', action: 'send' },
-        { id: 'info-3', text: '继续动机分析', action: 'motivate' }
-      ],
-      motivation: [
-        { id: 'motivation-1', text: '这个计划很好', action: 'send' },
-        { id: 'motivation-2', text: '我想修改承诺', action: 'send' },
-        { id: 'motivation-3', text: '确认创建', action: 'confirm' }
-      ],
-      confirmation: [
-        { id: 'confirm-1', text: '确认创建作品', action: 'confirm' },
-        { id: 'confirm-2', text: '调整信息', action: 'send' },
-        { id: 'confirm-3', text: '重新开始', action: 'send' }
-      ],
-      completed: []
-    };
-
-    return quickRepliesMap[stage] || [];
-  }
-
+  
   // 验证提取的数据
   validateExtractedData(data: ExtractedWorkData): { isValid: boolean; errors: string[] } {
     const errors: string[] = [];

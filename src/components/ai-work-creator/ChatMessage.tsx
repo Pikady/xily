@@ -1,25 +1,51 @@
 import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
-import { ChatMessage as ChatMessageType, QuickReplyOption } from '@/types/ai-work';
+import { ChatMessage as ChatMessageType } from '@/types/ai-work';
 import { Bot, User, CheckCircle } from 'lucide-react';
 
 interface ChatMessageProps {
   message: ChatMessageType;
-  onQuickReply?: (reply: string) => void;
 }
 
-export function ChatMessage({ message, onQuickReply }: ChatMessageProps) {
+export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
 
   const processedContent = useMemo(() => {
-    // 简单处理markdown格式的文本
+    // 移除所有markdown语法，只保留纯文本内容
     let content = message.content;
 
-    // 处理粗体文本
-    content = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    // 移除粗体语法 **text**
+    content = content.replace(/\*\*(.*?)\*\*/g, '$1');
 
-    // 处理换行
+    // 移除斜体语法 *text* 或 _text_
+    content = content.replace(/(\*|_)(.*?)\1/g, '$2');
+
+    // 移除标题语法 # ## ###
+    content = content.replace(/^#{1,6}\s+/gm, '');
+
+    // 移除链接语法 [text](url)
+    content = content.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+
+    // 移除图片语法 ![alt](url)
+    content = content.replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1');
+
+    // 移除代码块语法 ```code``` 或 `code`
+    content = content.replace(/```[\s\S]*?```/g, (match) => {
+      return match.replace(/```/g, '').trim();
+    });
+    content = content.replace(/`([^`]+)`/g, '$1');
+
+    // 移除列表语法 - 或 *
+    content = content.replace(/^[\s]*[-*]\s+/gm, '');
+
+    // 移除引用语法 >
+    content = content.replace(/^[\s]*>\s+/gm, '');
+
+    // 移除分割线语法 ---
+    content = content.replace(/^[\s]*-{3,}\s*$/gm, '');
+
+    // 处理换行 - 保留换行符
     content = content.replace(/\n/g, '<br>');
 
     return { __html: content };
@@ -56,21 +82,7 @@ export function ChatMessage({ message, onQuickReply }: ChatMessageProps) {
           dangerouslySetInnerHTML={processedContent}
         />
 
-        {/* 快捷回复 */}
-        {message.metadata?.quick_replies && onQuickReply && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {message.metadata.quick_replies.map((reply: string, index: number) => (
-              <button
-                key={index}
-                onClick={() => onQuickReply(reply)}
-                className="px-3 py-1 bg-background/50 hover:bg-background/70 rounded-full text-sm border transition-colors"
-              >
-                {reply}
-              </button>
-            ))}
-          </div>
-        )}
-
+        
       </div>
 
       {isUser && (
